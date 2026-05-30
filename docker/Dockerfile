@@ -1,0 +1,10 @@
+FROM golang:1.26
+
+
+RUN groupadd -g 1000 go && useradd -d /home/go -g 1000 -m go
+
+USER go
+
+WORKDIR /home/go
+
+CMD ["go", "run", "."]

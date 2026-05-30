@@ -1,0 +1,12 @@
+# Variables d'environnement
+.env
+
+# Cache de build Go
+.cache/
+
+# Configuration Go 
+.config/
+
+# Binaire compilé
+barterswap
+*.exe
