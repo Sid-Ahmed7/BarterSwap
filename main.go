@@ -21,24 +21,30 @@ func main() {
 
 	db, err := sql.Open("postgres", dsn)
 	if err != nil {
-		log.Fatalf("erreur ouverture DB: %v", err)
+		log.Fatalf("database open error: %v", err)
 	}
 	defer db.Close()
 
 	if err := db.Ping(); err != nil {
-		log.Fatalf("erreur connexion DB: %v", err)
+		log.Fatalf("database connection error: %v", err)
 	}
-	log.Println("connecté à la base de données")
+	log.Println("connected to database")
 
 	mux := http.NewServeMux()
+
+	mux.HandleFunc("POST /api/users", handleCreateUser(db))
+	mux.HandleFunc("GET /api/users/{id}", handleGetUser(db))
+	mux.HandleFunc("PUT /api/users/{id}", handleUpdateUser(db))
+	mux.HandleFunc("GET /api/users/{id}/skills", handleGetUserSkills(db))
+	mux.HandleFunc("PUT /api/users/{id}/skills", handleSetUserSkills(db))
 
 	port := os.Getenv("SERVER_PORT")
 	if port == "" {
 		port = "8080"
 	}
 
-	log.Printf("serveur démarré sur le port %s", port)
+	log.Printf("server started on port %s", port)
 	if err := http.ListenAndServe(":"+port, mux); err != nil {
-		log.Fatalf("erreur serveur: %v", err)
+		log.Fatalf("server error: %v", err)
 	}
 }
