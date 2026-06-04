@@ -1,0 +1,28 @@
+name: barterswap-test
+
+services:
+  db-test:
+    image: postgres:16-alpine
+    container_name: barterswap_db_test
+    env_file:
+      - .env.test
+    volumes:
+      - ./sql/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  test:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.test
+    container_name: barterswap_test_runner
+    env_file:
+      - .env.test
+    depends_on:
+      db-test:
+        condition: service_healthy
+    volumes:
+      - .:/home/go

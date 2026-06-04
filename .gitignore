@@ -1,5 +1,6 @@
 # Variables d'environnement
 .env
+.env.test
 
 # Cache de build Go
 .cache/
@@ -10,3 +11,5 @@
 # Binaire compilé
 barterswap
 *.exe
+
+bruno/

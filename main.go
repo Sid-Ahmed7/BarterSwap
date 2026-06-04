@@ -44,7 +44,7 @@ func main() {
 	}
 
 	log.Printf("server started on port %s", port)
-	if err := http.ListenAndServe(":"+port, mux); err != nil {
+	if err := http.ListenAndServe(":"+port, buildHandler(mux)); err != nil {
 		log.Fatalf("server error: %v", err)
 	}
 }

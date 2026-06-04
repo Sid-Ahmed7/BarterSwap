@@ -1,28 +1,26 @@
+name: barterswap
+
 services:
   go:
     build:
       context: .
       dockerfile: docker/Dockerfile
     container_name: barterswap_go
-    tty: true
-    stdin_open: true
     depends_on:
       db:
         condition: service_healthy
     env_file:
       - .env
     environment:
-      DB_HOST: ${DB_HOST}
-      DB_PORT: ${DB_PORT}
       DB_USER: ${POSTGRES_USER}
       DB_PASSWORD: ${POSTGRES_PASSWORD}
       DB_NAME: ${POSTGRES_DB}
-      SERVER_PORT: ${SERVER_PORT}
     ports:
       - "${SERVER_PORT}:${SERVER_PORT}"
+    tty: true
+    stdin_open: true
     volumes:
       - .:/home/go
-    working_dir: /home/go
 
   db:
     image: postgres:16-alpine

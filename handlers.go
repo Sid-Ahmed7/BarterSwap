@@ -1,13 +1,20 @@
 package main
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"errors"
 	"net/http"
 	"strconv"
+	"time"
 )
 
+const dbTimeout = 5 * time.Second
+
+func newCtx(r *http.Request) (context.Context, context.CancelFunc) {
+	return context.WithTimeout(r.Context(), dbTimeout)
+}
 
 func handleCreateUser(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -22,7 +29,10 @@ func handleCreateUser(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		user, err := createUser(db, body.Pseudo, body.Bio, body.Ville)
+		ctx, cancel := newCtx(r)
+		defer cancel()
+
+		user, err := createUser(ctx, db, body.Pseudo, body.Bio, body.Ville)
 		if err != nil {
 			if isUniqueViolation(err) {
 				errConflict(w, "username already taken")
@@ -46,7 +56,10 @@ func handleGetUser(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		user, err := getUserByID(db, id)
+		ctx, cancel := newCtx(r)
+		defer cancel()
+
+		user, err := getUserByID(ctx, db, id)
 		if errors.Is(err, ErrNotFound) {
 			errNotFound(w)
 			return
@@ -56,7 +69,7 @@ func handleGetUser(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		skills, err := getSkillsByUserID(db, id)
+		skills, err := getSkillsByUserID(ctx, db, id)
 		if err != nil {
 			errInternal(w)
 			return
@@ -93,7 +106,10 @@ func handleUpdateUser(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		user, err := updateUser(db, id, body.Pseudo, body.Bio, body.Ville)
+		ctx, cancel := newCtx(r)
+		defer cancel()
+
+		user, err := updateUser(ctx, db, id, body.Pseudo, body.Bio, body.Ville)
 		if errors.Is(err, ErrNotFound) {
 			errNotFound(w)
 			return
@@ -120,7 +136,10 @@ func handleGetUserSkills(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		if _, err := getUserByID(db, id); err != nil {
+		ctx, cancel := newCtx(r)
+		defer cancel()
+
+		if _, err := getUserByID(ctx, db, id); err != nil {
 			if errors.Is(err, ErrNotFound) {
 				errNotFound(w)
 				return
@@ -129,7 +148,7 @@ func handleGetUserSkills(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		skills, err := getSkillsByUserID(db, id)
+		skills, err := getSkillsByUserID(ctx, db, id)
 		if err != nil {
 			errInternal(w)
 			return
@@ -168,7 +187,10 @@ func handleSetUserSkills(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		if _, err := getUserByID(db, id); err != nil {
+		ctx, cancel := newCtx(r)
+		defer cancel()
+
+		if _, err := getUserByID(ctx, db, id); err != nil {
 			if errors.Is(err, ErrNotFound) {
 				errNotFound(w)
 				return
@@ -177,7 +199,7 @@ func handleSetUserSkills(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		if err := replaceSkills(db, id, skills); err != nil {
+		if err := replaceSkills(ctx, db, id, skills); err != nil {
 			errInternal(w)
 			return
 		}
