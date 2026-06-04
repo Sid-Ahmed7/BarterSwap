@@ -30,13 +30,14 @@ func main() {
 	}
 	log.Println("connected to database")
 
+	store := &DB{db}
 	mux := http.NewServeMux()
 
-	mux.HandleFunc("POST /api/users", handleCreateUser(db))
-	mux.HandleFunc("GET /api/users/{id}", handleGetUser(db))
-	mux.HandleFunc("PUT /api/users/{id}", handleUpdateUser(db))
-	mux.HandleFunc("GET /api/users/{id}/skills", handleGetUserSkills(db))
-	mux.HandleFunc("PUT /api/users/{id}/skills", handleSetUserSkills(db))
+	mux.HandleFunc("POST /api/users", handleCreateUser(store))
+	mux.HandleFunc("GET /api/users/{id}", handleGetUser(store))
+	mux.HandleFunc("PUT /api/users/{id}", handleUpdateUser(store))
+	mux.HandleFunc("GET /api/users/{id}/skills", handleGetUserSkills(store))
+	mux.HandleFunc("PUT /api/users/{id}/skills", handleSetUserSkills(store))
 
 	port := os.Getenv("SERVER_PORT")
 	if port == "" {

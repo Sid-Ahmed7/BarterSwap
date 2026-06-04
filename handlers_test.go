@@ -13,22 +13,22 @@ import (
 	_ "github.com/lib/pq"
 )
 
-func setupTestDB(t *testing.T) *sql.DB {
+func setupTestDB(t *testing.T) *DB {
 	t.Helper()
 	dsn := os.Getenv("TEST_DATABASE_URL")
 	if dsn == "" {
 		t.Skip("TEST_DATABASE_URL non défini, tests d'intégration ignorés")
 	}
-	db, err := sql.Open("postgres", dsn)
+	sqlDB, err := sql.Open("postgres", dsn)
 	if err != nil {
 		t.Fatalf("sql.Open: %v", err)
 	}
-	if err := db.Ping(); err != nil {
+	if err := sqlDB.Ping(); err != nil {
 		t.Skipf("connexion impossible à la DB de test: %v", err)
 	}
-	t.Cleanup(func() { db.Close() })
-	db.Exec("TRUNCATE users RESTART IDENTITY CASCADE")
-	return db
+	t.Cleanup(func() { sqlDB.Close() })
+	sqlDB.Exec("TRUNCATE users RESTART IDENTITY CASCADE")
+	return &DB{sqlDB}
 }
 
 // --- POST /api/users ---
