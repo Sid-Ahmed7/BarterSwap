@@ -20,3 +20,25 @@ type UserRequest struct {
 	Bio    string `json:"bio"`
 	Ville  string `json:"ville"`
 }
+
+type Service struct {
+	ID           int    `json:"id"`
+	ProviderID   int    `json:"provider_id"`
+	Titre        string `json:"titre"`
+	Description  string `json:"description,omitempty"`
+	Categorie    string `json:"categorie"`
+	DureeMinutes int    `json:"duree_minutes"`
+	Credits      int    `json:"credits"`
+	Ville        string `json:"ville,omitempty"`
+	Actif        bool   `json:"actif"`
+	CreatedAt    string `json:"created_at"`
+}
+
+type ServiceRequest struct {
+	Titre        string `json:"titre"`
+	Description  string `json:"description"`
+	Categorie    string `json:"categorie"`
+	DureeMinutes int    `json:"duree_minutes"`
+	Credits      int    `json:"credits"`
+	Ville        string `json:"ville"`
+}
