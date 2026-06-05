@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
 )
 
 func (db *DB) CreateService(ctx context.Context, providerID int, r ServiceRequest) (Service, error) {
@@ -44,4 +45,53 @@ func (db *DB) DeleteService(ctx context.Context, id int) error {
 		return ErrNotFound
 	}
 	return nil
+}
+
+func (db *DB) ListServices(ctx context.Context, filter ServiceListRequest) ([]Service, error) {
+
+	query := `SELECT id, provider_id, titre, COALESCE(description,''), categorie, duree_minutes, credits, COALESCE(ville,''), actif, created_at FROM services WHERE actif = true`
+	args := []interface{}{}
+	i := 1
+
+	if filter.Categorie != "" {
+		query += fmt.Sprintf(" AND categorie = $%d", i)
+		args = append(args, filter.Categorie)
+		i++
+	}
+	if filter.Ville != "" {
+		query += fmt.Sprintf(" AND ville = $%d", i)
+		args = append(args, filter.Ville)
+		i++
+	}
+	if filter.Search != "" {
+		pattern := "%" + filter.Search + "%"
+		query += fmt.Sprintf(" AND (titre ILIKE $%d OR description ILIKE $%d)", i, i+1)
+		args = append(args, pattern, pattern)
+		i += 2
+	}
+	query += " ORDER BY created_at DESC"
+
+	rows, err := db.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var services []Service
+	for rows.Next() {
+		var s Service
+		err := rows.Scan(&s.ID, &s.ProviderID, &s.Titre, &s.Description, &s.Categorie, &s.DureeMinutes, &s.Credits, &s.Ville, &s.Actif, &s.CreatedAt)
+		if err != nil {
+			return nil, err
+		}
+		services = append(services, s)
+	}
+
+	return services, rows.Err()
+}
+
+func (db *DB) HasSkillsForCategory(ctx context.Context, userID int, categorie string) (bool, error) {
+	var count int
+	err := db.QueryRowContext(ctx, queryHasSkillForCategory, userID, categorie).Scan(&count)
+	return count > 0, err
 }

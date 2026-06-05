@@ -39,6 +39,12 @@ func main() {
 	mux.HandleFunc("GET /api/users/{id}/skills", handleGetUserSkills(store))
 	mux.HandleFunc("PUT /api/users/{id}/skills", handleSetUserSkills(store))
 
+	mux.HandleFunc("POST /api/services", handleCreateService(store))
+	mux.HandleFunc("GET /api/services/{id}", handleGetService(store))
+	mux.HandleFunc("GET /api/services", handleListServices(store))
+	mux.HandleFunc("PUT /api/services/{id}", handleUpdateService(store))
+	mux.HandleFunc("DELETE /api/services/{id}", handleDeleteService(store))
+
 	port := os.Getenv("SERVER_PORT")
 	if port == "" {
 		port = "8080"

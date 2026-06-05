@@ -42,3 +42,9 @@ type ServiceRequest struct {
 	Credits      int    `json:"credits"`
 	Ville        string `json:"ville"`
 }
+
+type ServiceListRequest struct {
+	Categorie string `json:"categorie"`
+	Ville     string `json:"ville"`
+	Search    string `json:"search"`
+}

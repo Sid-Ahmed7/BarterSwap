@@ -80,8 +80,8 @@ func handleUpdateUser(store UserStore) http.HandlerFunc {
 			return
 		}
 
-		callerID, err := strconv.Atoi(r.Header.Get("X-UserID"))
-		if err != nil || callerID != id {
+		userID, err := strconv.Atoi(r.Header.Get("X-User-ID"))
+		if err != nil || userID != id {
 			errForbidden(w)
 			return
 		}
@@ -161,8 +161,8 @@ func handleSetUserSkills(store UserStore) http.HandlerFunc {
 			return
 		}
 
-		callerID, err := strconv.Atoi(r.Header.Get("X-UserID"))
-		if err != nil || callerID != id {
+		userID, err := strconv.Atoi(r.Header.Get("X-User-ID"))
+		if err != nil || userID != id {
 			errForbidden(w)
 			return
 		}

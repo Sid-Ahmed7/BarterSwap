@@ -22,4 +22,6 @@ const (
     RETURNING id, provider_id, titre, COALESCE(description,''), categorie, duree_minutes, credits, COALESCE(ville,''), actif, created_at`
 
 	queryDeleteService = `DELETE FROM services WHERE id = $1`
+
+	queryHasSkillForCategory = `SELECT COUNT(*) FROM skills WHERE user_id = $1 AND nom = $2`
 )
