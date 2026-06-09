@@ -9,6 +9,7 @@ import (
 )
 
 var ErrNotFound = errors.New("not found")
+var ErrInsufficientCredits = errors.New("insufficient credits")
 
 type ValidationError struct {
 	Field   string

@@ -22,4 +22,14 @@ type ServiceStore interface {
 	HasSkillsForCategory(ctx context.Context, userID int, categorie string) (bool, error)
 }
 
+type ExchangeStore interface {
+	CreateExchange(ctx context.Context, requesterID, serviceID, ownerID int) (Exchange, error)
+	GetExchangeByID(ctx context.Context, id int) (Exchange, error)
+	ListExchanges(ctx context.Context, userID int, status string) ([]Exchange, error)
+	HasActiveExchange(ctx context.Context, serviceID int) (bool, error)
+	AcceptExchange(ctx context.Context, id int) (Exchange, error)
+	RejectExchange(ctx context.Context, id int) (Exchange, error)
+	CompleteExchange(ctx context.Context, id int) (Exchange, error)
+	CancelExchange(ctx context.Context, id int) (Exchange, error)
+}
 type DB struct{ *sql.DB }
