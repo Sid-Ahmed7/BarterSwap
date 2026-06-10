@@ -2,8 +2,6 @@ package main
 
 import (
 	"context"
-	"database/sql"
-	"errors"
 )
 
 func (d *DB) CreateUser(ctx context.Context, r UserRequest) (User, error) {
@@ -15,19 +13,13 @@ func (d *DB) CreateUser(ctx context.Context, r UserRequest) (User, error) {
 func (d *DB) GetUserByID(ctx context.Context, id int) (User, error) {
 	var u User
 	err := scanUser(d.QueryRowContext(ctx, queryGetUserByID, id), &u)
-	if errors.Is(err, sql.ErrNoRows) {
-		return u, ErrNotFound
-	}
-	return u, err
+	return u, mapErrNotFound(err)
 }
 
 func (d *DB) UpdateUser(ctx context.Context, id int, r UserRequest) (User, error) {
 	var u User
 	err := scanUser(d.QueryRowContext(ctx, queryUpdateUser, r.Pseudo, r.Bio, r.Ville, id), &u)
-	if errors.Is(err, sql.ErrNoRows) {
-		return u, ErrNotFound
-	}
-	return u, err
+	return u, mapErrNotFound(err)
 }
 
 func (d *DB) GetSkillsByUserID(ctx context.Context, userID int) ([]Skill, error) {
@@ -45,7 +37,7 @@ func (d *DB) GetSkillsByUserID(ctx context.Context, userID int) ([]Skill, error)
 		}
 		skills = append(skills, s)
 	}
-	return skills, nil
+	return skills, rows.Err()
 }
 
 func (d *DB) ReplaceSkills(ctx context.Context, userID int, skills []Skill) error {

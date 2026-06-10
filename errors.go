@@ -1,6 +1,7 @@
 package main
 
 import (
+	"database/sql"
 	"errors"
 	"fmt"
 	"net/http"
@@ -52,4 +53,19 @@ func respondError(w http.ResponseWriter, err error) {
 		return
 	}
 	errBadRequest(w, err.Error())
+}
+
+func mapErrNotFound(err error) error {
+	if errors.Is(err, sql.ErrNoRows) {
+		return ErrNotFound
+	}
+	return err
+}
+
+func errUsernameTaken(w http.ResponseWriter, err error) {
+	if isUniqueViolation(err) {
+		errConflict(w, "username already taken")
+		return
+	}
+	errInternal(w)
 }
