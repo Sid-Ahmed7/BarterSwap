@@ -1,16 +1,14 @@
 package main
 
 import (
-	"encoding/json"
 	"errors"
 	"net/http"
-	"strconv"
 )
 
 func handleCreateUser(store UserStore) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var body UserRequest
-		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		if err := decodeJSONBody(r, &body); err != nil {
 			errBadRequest(w, "invalid body")
 			return
 		}
@@ -25,23 +23,17 @@ func handleCreateUser(store UserStore) http.HandlerFunc {
 
 		user, err := store.CreateUser(ctx, body)
 		if err != nil {
-			if isUniqueViolation(err) {
-				errConflict(w, "username already taken")
-				return
-			}
-			errInternal(w)
+			errUsernameTaken(w, err)
 			return
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusCreated)
-		json.NewEncoder(w).Encode(user)
+		respondJSON(w, http.StatusCreated, user)
 	}
 }
 
 func handleGetUser(store UserStore) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		id, err := strconv.Atoi(r.PathValue("id"))
+		id, err := parseID(r)
 		if err != nil {
 			errBadRequest(w, "invalid id")
 			return
@@ -67,27 +59,19 @@ func handleGetUser(store UserStore) http.HandlerFunc {
 		}
 		user.Skills = skills
 
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(user)
+		respondJSON(w, http.StatusOK, user)
 	}
 }
 
 func handleUpdateUser(store UserStore) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		id, err := strconv.Atoi(r.PathValue("id"))
-		if err != nil {
-			errBadRequest(w, "invalid id")
-			return
-		}
-
-		userID, err := strconv.Atoi(r.Header.Get("X-User-ID"))
-		if err != nil || userID != id {
-			errForbidden(w)
+		id, isAuthorized := checkSelfAccess(w, r)
+		if !isAuthorized {
 			return
 		}
 
 		var body UserRequest
-		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		if err := decodeJSONBody(r, &body); err != nil {
 			errBadRequest(w, "invalid body")
 			return
 		}
@@ -106,22 +90,17 @@ func handleUpdateUser(store UserStore) http.HandlerFunc {
 			return
 		}
 		if err != nil {
-			if isUniqueViolation(err) {
-				errConflict(w, "username already taken")
-				return
-			}
-			errInternal(w)
+			errUsernameTaken(w, err)
 			return
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(user)
+		respondJSON(w, http.StatusOK, user)
 	}
 }
 
 func handleGetUserSkills(store UserStore) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		id, err := strconv.Atoi(r.PathValue("id"))
+		id, err := parseID(r)
 		if err != nil {
 			errBadRequest(w, "invalid id")
 			return
@@ -130,12 +109,7 @@ func handleGetUserSkills(store UserStore) http.HandlerFunc {
 		ctx, cancel := newCtx(r)
 		defer cancel()
 
-		if _, err := store.GetUserByID(ctx, id); err != nil {
-			if errors.Is(err, ErrNotFound) {
-				errNotFound(w)
-				return
-			}
-			errInternal(w)
+		if !checkUserExists(w, store, ctx, id) {
 			return
 		}
 
@@ -148,27 +122,19 @@ func handleGetUserSkills(store UserStore) http.HandlerFunc {
 			skills = []Skill{}
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(skills)
+		respondJSON(w, http.StatusOK, skills)
 	}
 }
 
 func handleSetUserSkills(store UserStore) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		id, err := strconv.Atoi(r.PathValue("id"))
-		if err != nil {
-			errBadRequest(w, "invalid id")
-			return
-		}
-
-		userID, err := strconv.Atoi(r.Header.Get("X-User-ID"))
-		if err != nil || userID != id {
-			errForbidden(w)
+		id, isAuthorized := checkSelfAccess(w, r)
+		if !isAuthorized {
 			return
 		}
 
 		var skills []Skill
-		if err := json.NewDecoder(r.Body).Decode(&skills); err != nil {
+		if err := decodeJSONBody(r, &skills); err != nil {
 			errBadRequest(w, "invalid body")
 			return
 		}
@@ -181,12 +147,7 @@ func handleSetUserSkills(store UserStore) http.HandlerFunc {
 		ctx, cancel := newCtx(r)
 		defer cancel()
 
-		if _, err := store.GetUserByID(ctx, id); err != nil {
-			if errors.Is(err, ErrNotFound) {
-				errNotFound(w)
-				return
-			}
-			errInternal(w)
+		if !checkUserExists(w, store, ctx, id) {
 			return
 		}
 
@@ -195,7 +156,6 @@ func handleSetUserSkills(store UserStore) http.HandlerFunc {
 			return
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(skills)
+		respondJSON(w, http.StatusOK, skills)
 	}
 }

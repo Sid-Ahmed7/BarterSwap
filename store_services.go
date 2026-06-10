@@ -2,8 +2,6 @@ package main
 
 import (
 	"context"
-	"database/sql"
-	"errors"
 	"fmt"
 )
 
@@ -16,20 +14,13 @@ func (db *DB) CreateService(ctx context.Context, providerID int, r ServiceReques
 func (db *DB) GetServiceByID(ctx context.Context, id int) (Service, error) {
 	var s Service
 	err := scanService(db.QueryRowContext(ctx, queryGetServiceByID, id), &s)
-	if errors.Is(err, sql.ErrNoRows) {
-		return s, ErrNotFound
-	}
-
-	return s, err
+	return s, mapErrNotFound(err)
 }
 
 func (db *DB) UpdateService(ctx context.Context, id int, r ServiceRequest) (Service, error) {
 	var s Service
 	err := scanService(db.QueryRowContext(ctx, queryUpdateService, id, r.Titre, r.Description, r.Categorie, r.DureeMinutes, r.Credits, r.Ville), &s)
-	if errors.Is(err, sql.ErrNoRows) {
-		return s, ErrNotFound
-	}
-	return s, err
+	return s, mapErrNotFound(err)
 }
 
 func (db *DB) DeleteService(ctx context.Context, id int) error {
