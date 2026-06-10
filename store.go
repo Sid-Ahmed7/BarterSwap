@@ -23,7 +23,7 @@ type ServiceStore interface {
 }
 
 type ExchangeStore interface {
-	CreateExchange(ctx context.Context, requesterID, serviceID, ownerID int) (Exchange, error)
+	CreateExchange(ctx context.Context, req ExchangeRequest) (Exchange, error)
 	GetExchangeByID(ctx context.Context, id int) (Exchange, error)
 	ListExchanges(ctx context.Context, userID int, status string) ([]Exchange, error)
 	HasActiveExchange(ctx context.Context, serviceID int) (bool, error)

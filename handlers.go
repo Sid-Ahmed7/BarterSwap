@@ -27,10 +27,10 @@ func decodeJSONBody(r *http.Request, body interface{}) error {
 	return json.NewDecoder(r.Body).Decode(body)
 }
 
-func respondJSON(w http.ResponseWriter, status int, body interface{}) {
+func respondJSON(w http.ResponseWriter, status int, response interface{}) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
-	json.NewEncoder(w).Encode(body)
+	json.NewEncoder(w).Encode(response)
 }
 
 func checkSelfAccess(w http.ResponseWriter, r *http.Request) (int, bool) {
