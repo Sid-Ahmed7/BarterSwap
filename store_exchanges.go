@@ -105,3 +105,36 @@ func (db *DB) RejectExchange(ctx context.Context, id int) (Exchange, error) {
 	}
 	return e, err
 }
+
+func (db *DB) CompleteExchange(ctx context.Context, id int) (Exchange, error) {
+	tx, err := db.BeginTx(ctx, nil)
+
+	if err != nil {
+		return Exchange{}, err
+	}
+
+	defer tx.Rollback()
+
+	var e Exchange
+
+	if err = scanExchange(tx.QueryRowContext(ctx, queryGetExchangeByID, id), &e); errors.Is(err, sql.ErrNoRows) {
+		return e, ErrNotFound
+	} else if err != nil {
+		return e, err
+	}
+
+	var credits int
+
+	if err = tx.QueryRowContext(ctx, queryGetServiceCredits, e.ServiceID).Scan(&credits); err != nil {
+		return e, err
+	}
+	if _, err = tx.ExecContext(ctx, queryAddCredits, e.OwnerID, credits); err != nil {
+		return e, err
+	}
+
+	if _, err = tx.ExecContext(ctx, queryInsertCreditTransaction, e.ServiceID); err != nil {
+		return e, err
+	}
+
+	return e, tx.Commit()
+}
