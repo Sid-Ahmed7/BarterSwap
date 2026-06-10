@@ -24,4 +24,20 @@ const (
 	queryDeleteService = `DELETE FROM services WHERE id = $1`
 
 	queryHasSkillForCategory = `SELECT COUNT(*) FROM skills WHERE user_id = $1 AND nom = $2`
+
+	queryCreateExchange = `INSERT INTO exchanges (service_id, requester_id, owner_id) VALUES ($1, $2, $3) RETURNING id, service_id, requester_id, owner_id, status, created_at, updated_at`
+
+	queryGetExchangeByID = `SELECT id, service_id, requester_id, owner_id, status, created_at, updated_at FROM exchanges WHERE id = $1`
+
+	queryUpdateExchangeStatus = `UPDATE exchanges SET status = $2, updated_at = NOW() WHERE id = $1 RETURNING id, service_id, requester_id, owner_id, status, created_at, updated_at`
+
+	queryHasActiveExchange = `SELECT COUNT(*) FROM exchanges WHERE service_id = $1 AND status IN ('pending', 'accepted')`
+
+	queryGetServiceCredits = `SELECT credits FROM services WHERE id = $1`
+
+	queryDeductCredits = `UPDATE users SET credit_balance = credit_balance - $2 WHERE id = $1 AND credit_balance >= $2`
+
+	queryAddCredits = `UPDATE users SET credit_balance = credit_balance + $2 WHERE id = $1`
+
+	queryInsertCreditTransaction = `INSERT INTO credit_transactions (user_id, exchange_id, montant, type) VALUES ($1, $2, $3, $4)`
 )

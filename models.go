@@ -48,3 +48,28 @@ type ServiceListRequest struct {
 	Ville     string `json:"ville"`
 	Search    string `json:"search"`
 }
+
+type Exchange struct {
+	ID          int    `json:"id"`
+	ServiceID   int    `json:"service_id"`
+	RequesterID int    `json:"requester_id"`
+	OwnerID     int    `json:"owner_id"`
+	Status      string `json:"status"`
+	CreatedAt   string `json:"created_at"`
+	UpdatedAt   string `json:"updated_at"`
+}
+
+type CreditTransaction struct {
+	ID         int    `json:"id"`
+	UserID     int    `json:"user_id"`
+	ExchangeID int    `json:"exchange_id"`
+	Montant    int    `json:"montant"`
+	Type       string `json:"type"`
+	CreatedAt  string `json:"created_at"`
+}
+
+type ExchangeRequest struct {
+	ServiceID   int `json:"service_id"`
+	RequesterID int `json:"requester_id"`
+	OwnerID     int `json:"owner_id"`
+}
