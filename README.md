@@ -1,4 +1,4 @@
-# BarterSwap — API 
+# BarterSwap — API d'échange de compétences
 
 API REST en Go.
 
