@@ -40,4 +40,12 @@ const (
 	queryAddCredits = `UPDATE users SET credit_balance = credit_balance + $2 WHERE id = $1`
 
 	queryInsertCreditTransaction = `INSERT INTO credit_transactions (user_id, exchange_id, montant, type) VALUES ($1, $2, $3, $4)`
+
+	queryCreateReview = `INSERT INTO reviews (exchange_id, author_id, target_id, note, commentaire) VALUES ($1, $2, $3, $4, $5) RETURNING id, exchange_id, author_id, target_id, note, COALESCE(commentaire, ''), created_at`
+
+	queryHasReview = `SELECT COUNT(*) FROM reviews WHERE exchange_id = $1 AND author_id = $2`
+
+	queryGetReviewsByUserID = `SELECT id, exchange_id, author_id, target_id, note, COALESCE(commentaire, ''), created_at FROM reviews WHERE target_id = $1`
+
+	queryGetReviewsByServiceID = `SELECT r.id, r.exchange_id, r.author_id, r.target_id, r.note, COALESCE(r.commentaire, ''), r.created_at FROM reviews r JOIN exchanges e ON r.exchange_id = e.id WHERE e.service_id = $1`
 )

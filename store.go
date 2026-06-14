@@ -32,4 +32,10 @@ type ExchangeStore interface {
 	CompleteExchange(ctx context.Context, id int) (Exchange, error)
 	CancelExchange(ctx context.Context, id int) (Exchange, error)
 }
+
+type ReviewStore interface {
+	CreateReview(ctx context.Context, exchangeID int, authorID int, req ReviewRequest) (Review, error)
+	GetReviewsByUserID(ctx context.Context, userID int) ([]Review, error)
+	GetReviewsByServiceID(ctx context.Context, serviceID int) ([]Review, error)
+}
 type DB struct{ *sql.DB }

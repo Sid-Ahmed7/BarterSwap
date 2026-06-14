@@ -11,6 +11,9 @@ import (
 
 var ErrNotFound = errors.New("not found")
 var ErrInsufficientCredits = errors.New("insufficient credits")
+var ErrAlreadyReviewed = errors.New("already reviewed")
+var ErrNotCompleted = errors.New("exchange not completed")
+var ErrForbidden = errors.New("forbidden")
 
 type ValidationError struct {
 	Field   string
