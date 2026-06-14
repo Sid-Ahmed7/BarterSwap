@@ -65,7 +65,7 @@ func handleCreateExchange(exchangeStore ExchangeStore, serviceStore ServiceStore
 		}
 
 		if isActive {
-			errBadRequest(w, "Service already has an active exchange")
+			errConflict(w, "Service already has an active exchange")
 			return
 		}
 
