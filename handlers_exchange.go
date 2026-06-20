@@ -37,24 +37,18 @@ func handleCreateExchange(exchangeStore ExchangeStore, serviceStore ServiceStore
 			return
 		}
 
-		if service.ProviderID == userID {
-			errBadRequest(w, "Cannot exchange for your own service")
-			return
-		}
-
 		requester, err := userStore.GetUserByID(ctx, userID)
 		if errors.Is(err, ErrNotFound) {
 			errNotFound(w)
 			return
 		}
-
 		if err != nil {
 			errInternal(w)
 			return
 		}
 
-		if requester.CreditBalance < service.Credits {
-			errBadRequest(w, "Insufficient credits")
+		if err := validateExchangeCreation(userID, service, requester.CreditBalance); err != nil {
+			respondError(w, err)
 			return
 		}
 
@@ -63,7 +57,6 @@ func handleCreateExchange(exchangeStore ExchangeStore, serviceStore ServiceStore
 			errInternal(w)
 			return
 		}
-
 		if isActive {
 			errConflict(w, "Service already has an active exchange")
 			return

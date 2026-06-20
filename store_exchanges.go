@@ -64,41 +64,7 @@ func getServiceCredits(ctx context.Context, tx *sql.Tx, serviceID int) (int, err
 }
 
 func (db *DB) AcceptExchange(ctx context.Context, id int) (Exchange, error) {
-	tx, err := db.BeginTx(ctx, nil)
-	if err != nil {
-		return Exchange{}, err
-	}
-	defer tx.Rollback()
-
-	e, err := getExchange(ctx, tx, id)
-	if err != nil {
-		return e, err
-	}
-
-	credits, err := getServiceCredits(ctx, tx, e.ServiceID)
-	if err != nil {
-		return e, err
-	}
-
-	result, err := tx.ExecContext(ctx, queryDeductCredits, e.RequesterID, credits)
-	if err != nil {
-		return e, err
-	}
-
-	updatedRows, _ := result.RowsAffected()
-	if updatedRows == 0 {
-		return e, ErrInsufficientCredits
-	}
-
-	if err = scanExchange(tx.QueryRowContext(ctx, queryUpdateExchangeStatus, id, "accepted"), &e); err != nil {
-		return e, err
-	}
-
-	if _, err = tx.ExecContext(ctx, queryInsertCreditTransaction, e.RequesterID, id, -credits, "spend"); err != nil {
-		return e, err
-	}
-
-	return e, tx.Commit()
+	return processAcceptExchange(ctx, db, id)
 }
 
 func (db *DB) RejectExchange(ctx context.Context, id int) (Exchange, error) {
@@ -108,60 +74,9 @@ func (db *DB) RejectExchange(ctx context.Context, id int) (Exchange, error) {
 }
 
 func (db *DB) CancelExchange(ctx context.Context, id int) (Exchange, error) {
-	tx, err := db.BeginTx(ctx, nil)
-	if err != nil {
-		return Exchange{}, err
-	}
-	defer tx.Rollback()
-
-	e, err := getExchange(ctx, tx, id)
-	if err != nil {
-		return e, err
-	}
-
-	if e.Status == "accepted" {
-		credits, err := getServiceCredits(ctx, tx, e.ServiceID)
-		if err != nil {
-			return e, err
-		}
-		if _, err = tx.ExecContext(ctx, queryAddCredits, e.RequesterID, credits); err != nil {
-			return e, err
-		}
-		if _, err = tx.ExecContext(ctx, queryInsertCreditTransaction, e.RequesterID, id, credits, "refund"); err != nil {
-			return e, err
-		}
-	}
-
-	if err = scanExchange(tx.QueryRowContext(ctx, queryUpdateExchangeStatus, id, "cancelled"), &e); err != nil {
-		return e, err
-	}
-	return e, tx.Commit()
+	return processCancelExchange(ctx, db, id)
 }
 
 func (db *DB) CompleteExchange(ctx context.Context, id int) (Exchange, error) {
-	tx, err := db.BeginTx(ctx, nil)
-	if err != nil {
-		return Exchange{}, err
-	}
-	defer tx.Rollback()
-
-	e, err := getExchange(ctx, tx, id)
-	if err != nil {
-		return e, err
-	}
-
-	credits, err := getServiceCredits(ctx, tx, e.ServiceID)
-	if err != nil {
-		return e, err
-	}
-
-	if _, err = tx.ExecContext(ctx, queryAddCredits, e.OwnerID, credits); err != nil {
-		return e, err
-	}
-
-	if _, err = tx.ExecContext(ctx, queryInsertCreditTransaction, e.OwnerID, id, credits, "earn"); err != nil {
-		return e, err
-	}
-
-	return e, tx.Commit()
+	return processCompleteExchange(ctx, db, id)
 }

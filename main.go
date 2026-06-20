@@ -43,7 +43,7 @@ func main() {
 	mux.HandleFunc("GET /api/services/{id}", handleGetService(store))
 	mux.HandleFunc("GET /api/services", handleListServices(store))
 	mux.HandleFunc("PUT /api/services/{id}", handleUpdateService(store))
-	mux.HandleFunc("DELETE /api/services/{id}", handleDeleteService(store))
+	mux.HandleFunc("DELETE /api/services/{id}", handleDeleteService(store, store))
 
 	mux.HandleFunc("POST /api/exchanges", handleCreateExchange(store, store, store))
 	mux.HandleFunc("GET /api/exchanges", handleListExchanges(store))
@@ -52,6 +52,11 @@ func main() {
 	mux.HandleFunc("PUT /api/exchanges/{id}/reject", handleRejectExchange(store))
 	mux.HandleFunc("PUT /api/exchanges/{id}/complete", handleCompleteExchange(store))
 	mux.HandleFunc("PUT /api/exchanges/{id}/cancel", handleCancelExchange(store))
+
+	mux.HandleFunc("POST /api/exchanges/{id}/review", handleCreateReview(store, store))
+	mux.HandleFunc("GET /api/users/{id}/reviews", handleGetUserReviews(store))
+	mux.HandleFunc("GET /api/services/{id}/reviews", handleGetServiceReviews(store))
+	mux.HandleFunc("GET /api/users/{id}/stats", handleGetUserStats(store))
 
 	port := os.Getenv("SERVER_PORT")
 	if port == "" {

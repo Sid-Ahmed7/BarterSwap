@@ -449,14 +449,12 @@ func TestHandleUpdateService_Success(t *testing.T) {
 	}
 }
 
-// --- DELETE /api/services/{id} ---
-
 func TestHandleDeleteService_InvalidID(t *testing.T) {
 	req := httptest.NewRequest(http.MethodDelete, "/api/services/abc", nil)
 	req.SetPathValue("id", "abc")
 	req.Header.Set("X-User-ID", "1")
 	rr := httptest.NewRecorder()
-	handleDeleteService(nil)(rr, req)
+	handleDeleteService(nil, nil)(rr, req)
 	if rr.Code != http.StatusBadRequest {
 		t.Errorf("got %d, want 400", rr.Code)
 	}
@@ -468,7 +466,7 @@ func TestHandleDeleteService_NotFound(t *testing.T) {
 	req.SetPathValue("id", "999999")
 	req.Header.Set("X-User-ID", "1")
 	rr := httptest.NewRecorder()
-	handleDeleteService(db)(rr, req)
+	handleDeleteService(db, db)(rr, req)
 	if rr.Code != http.StatusNotFound {
 		t.Errorf("got %d, want 404", rr.Code)
 	}
@@ -493,9 +491,27 @@ func TestHandleDeleteService_Forbidden(t *testing.T) {
 	req.SetPathValue("id", id)
 	req.Header.Set("X-User-ID", fmt.Sprint(other.ID))
 	rr = httptest.NewRecorder()
-	handleDeleteService(db)(rr, req)
+	handleDeleteService(db, db)(rr, req)
 	if rr.Code != http.StatusForbidden {
 		t.Errorf("got %d, want 403", rr.Code)
+	}
+}
+
+func TestHandleDeleteService_ActiveExchange(t *testing.T) {
+	db := setupTestDB(t)
+	owner := createTestUser(t, db, "svc-del-owner")
+	requester := createTestUser(t, db, "svc-del-requester")
+	svc := createTestService(t, db, owner.ID, "Jardinage")
+	createTestExchange(t, db, requester.ID, svc.ID)
+
+	id := fmt.Sprint(svc.ID)
+	req := httptest.NewRequest(http.MethodDelete, "/api/services/"+id, nil)
+	req.SetPathValue("id", id)
+	req.Header.Set("X-User-ID", fmt.Sprint(owner.ID))
+	rr := httptest.NewRecorder()
+	handleDeleteService(db, db)(rr, req)
+	if rr.Code != http.StatusConflict {
+		t.Errorf("got %d, want 409", rr.Code)
 	}
 }
 
@@ -517,7 +533,7 @@ func TestHandleDeleteService_Success(t *testing.T) {
 	req.SetPathValue("id", id)
 	req.Header.Set("X-User-ID", fmt.Sprint(u.ID))
 	rr = httptest.NewRecorder()
-	handleDeleteService(db)(rr, req)
+	handleDeleteService(db, db)(rr, req)
 	if rr.Code != http.StatusNoContent {
 		t.Errorf("got %d, want 204", rr.Code)
 	}
@@ -613,5 +629,771 @@ func TestHandleListServices_Search(t *testing.T) {
 	json.NewDecoder(rr.Body).Decode(&svcs)
 	if len(svcs) != 2 {
 		t.Errorf("len = %d, want 2 (case-insensitive search)", len(svcs))
+	}
+}
+
+// ---- helpers exchange/review/stats ----
+
+func createTestService(t *testing.T, db *DB, userID int, categorie string) Service {
+	t.Helper()
+	setSkills(t, db, userID, []Skill{{Nom: categorie, Niveau: "expert"}})
+	body, _ := json.Marshal(ServiceRequest{Titre: "Service " + categorie, Categorie: categorie, DureeMinutes: 60, Credits: 2})
+	req := httptest.NewRequest(http.MethodPost, "/api/services", bytes.NewReader(body))
+	req.Header.Set("X-User-ID", fmt.Sprint(userID))
+	rr := httptest.NewRecorder()
+	handleCreateService(db)(rr, req)
+	if rr.Code != http.StatusCreated {
+		t.Fatalf("createTestService: got %d — %s", rr.Code, rr.Body.String())
+	}
+	var svc Service
+	json.NewDecoder(rr.Body).Decode(&svc)
+	return svc
+}
+
+func createTestExchange(t *testing.T, db *DB, requesterID, serviceID int) Exchange {
+	t.Helper()
+	body, _ := json.Marshal(ExchangeRequest{ServiceID: serviceID})
+	req := httptest.NewRequest(http.MethodPost, "/api/exchanges", bytes.NewReader(body))
+	req.Header.Set("X-User-ID", fmt.Sprint(requesterID))
+	rr := httptest.NewRecorder()
+	handleCreateExchange(db, db, db)(rr, req)
+	if rr.Code != http.StatusCreated {
+		t.Fatalf("createTestExchange: got %d — %s", rr.Code, rr.Body.String())
+	}
+	var e Exchange
+	json.NewDecoder(rr.Body).Decode(&e)
+	return e
+}
+
+func acceptTestExchange(t *testing.T, db *DB, exchangeID, ownerID int) Exchange {
+	t.Helper()
+	id := fmt.Sprint(exchangeID)
+	req := httptest.NewRequest(http.MethodPut, "/api/exchanges/"+id+"/accept", nil)
+	req.SetPathValue("id", id)
+	req.Header.Set("X-User-ID", fmt.Sprint(ownerID))
+	rr := httptest.NewRecorder()
+	handleAcceptExchange(db)(rr, req)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("acceptTestExchange: got %d — %s", rr.Code, rr.Body.String())
+	}
+	var e Exchange
+	json.NewDecoder(rr.Body).Decode(&e)
+	return e
+}
+
+func completeTestExchange(t *testing.T, db *DB, exchangeID, requesterID int) Exchange {
+	t.Helper()
+	id := fmt.Sprint(exchangeID)
+	req := httptest.NewRequest(http.MethodPut, "/api/exchanges/"+id+"/complete", nil)
+	req.SetPathValue("id", id)
+	req.Header.Set("X-User-ID", fmt.Sprint(requesterID))
+	rr := httptest.NewRecorder()
+	handleCompleteExchange(db)(rr, req)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("completeTestExchange: got %d — %s", rr.Code, rr.Body.String())
+	}
+	var e Exchange
+	json.NewDecoder(rr.Body).Decode(&e)
+	return e
+}
+
+// ---- exchanges ----
+
+func TestHandleCreateExchange_MissingUserID(t *testing.T) {
+	body, _ := json.Marshal(ExchangeRequest{ServiceID: 1})
+	req := httptest.NewRequest(http.MethodPost, "/api/exchanges", bytes.NewReader(body))
+	rr := httptest.NewRecorder()
+	handleCreateExchange(nil, nil, nil)(rr, req)
+	if rr.Code != http.StatusBadRequest {
+		t.Errorf("got %d, want 400", rr.Code)
+	}
+}
+
+func TestHandleCreateExchange_InvalidBody(t *testing.T) {
+	req := httptest.NewRequest(http.MethodPost, "/api/exchanges", bytes.NewBufferString("not json"))
+	req.Header.Set("X-User-ID", "1")
+	rr := httptest.NewRecorder()
+	handleCreateExchange(nil, nil, nil)(rr, req)
+	if rr.Code != http.StatusBadRequest {
+		t.Errorf("got %d, want 400", rr.Code)
+	}
+}
+
+func TestHandleCreateExchange_ServiceNotFound(t *testing.T) {
+	db := setupTestDB(t)
+	body, _ := json.Marshal(ExchangeRequest{ServiceID: 999999})
+	req := httptest.NewRequest(http.MethodPost, "/api/exchanges", bytes.NewReader(body))
+	req.Header.Set("X-User-ID", "1")
+	rr := httptest.NewRecorder()
+	handleCreateExchange(db, db, db)(rr, req)
+	if rr.Code != http.StatusNotFound {
+		t.Errorf("got %d, want 404", rr.Code)
+	}
+}
+
+func TestHandleCreateExchange_SelfExchange(t *testing.T) {
+	db := setupTestDB(t)
+	owner := createTestUser(t, db, "self-owner")
+	svc := createTestService(t, db, owner.ID, "Sport")
+
+	body, _ := json.Marshal(ExchangeRequest{ServiceID: svc.ID})
+	req := httptest.NewRequest(http.MethodPost, "/api/exchanges", bytes.NewReader(body))
+	req.Header.Set("X-User-ID", fmt.Sprint(owner.ID))
+	rr := httptest.NewRecorder()
+	handleCreateExchange(db, db, db)(rr, req)
+	if rr.Code != http.StatusBadRequest {
+		t.Errorf("got %d, want 400", rr.Code)
+	}
+}
+
+func TestHandleCreateExchange_InsufficientCredits(t *testing.T) {
+	db := setupTestDB(t)
+	owner := createTestUser(t, db, "rich-owner")
+	requester := createTestUser(t, db, "poor-requester")
+
+	setSkills(t, db, owner.ID, []Skill{{Nom: "Tutorat", Niveau: "expert"}})
+	body, _ := json.Marshal(ServiceRequest{Titre: "Cours premium", Categorie: "Tutorat", DureeMinutes: 60, Credits: 15})
+	req := httptest.NewRequest(http.MethodPost, "/api/services", bytes.NewReader(body))
+	req.Header.Set("X-User-ID", fmt.Sprint(owner.ID))
+	rr := httptest.NewRecorder()
+	handleCreateService(db)(rr, req)
+	var svc Service
+	json.NewDecoder(rr.Body).Decode(&svc)
+
+	body, _ = json.Marshal(ExchangeRequest{ServiceID: svc.ID})
+	req = httptest.NewRequest(http.MethodPost, "/api/exchanges", bytes.NewReader(body))
+	req.Header.Set("X-User-ID", fmt.Sprint(requester.ID))
+	rr = httptest.NewRecorder()
+	handleCreateExchange(db, db, db)(rr, req)
+	if rr.Code != http.StatusBadRequest {
+		t.Errorf("got %d, want 400", rr.Code)
+	}
+}
+
+func TestHandleCreateExchange_AlreadyBooked(t *testing.T) {
+	db := setupTestDB(t)
+	owner := createTestUser(t, db, "booked-owner")
+	req1 := createTestUser(t, db, "booked-req1")
+	req2 := createTestUser(t, db, "booked-req2")
+	svc := createTestService(t, db, owner.ID, "Musique")
+
+	createTestExchange(t, db, req1.ID, svc.ID)
+
+	body, _ := json.Marshal(ExchangeRequest{ServiceID: svc.ID})
+	req := httptest.NewRequest(http.MethodPost, "/api/exchanges", bytes.NewReader(body))
+	req.Header.Set("X-User-ID", fmt.Sprint(req2.ID))
+	rr := httptest.NewRecorder()
+	handleCreateExchange(db, db, db)(rr, req)
+	if rr.Code != http.StatusConflict {
+		t.Errorf("got %d, want 409", rr.Code)
+	}
+}
+
+func TestHandleCreateExchange_Success(t *testing.T) {
+	db := setupTestDB(t)
+	owner := createTestUser(t, db, "exch-owner")
+	requester := createTestUser(t, db, "exch-requester")
+	svc := createTestService(t, db, owner.ID, "Jardinage")
+
+	body, _ := json.Marshal(ExchangeRequest{ServiceID: svc.ID})
+	req := httptest.NewRequest(http.MethodPost, "/api/exchanges", bytes.NewReader(body))
+	req.Header.Set("X-User-ID", fmt.Sprint(requester.ID))
+	rr := httptest.NewRecorder()
+	handleCreateExchange(db, db, db)(rr, req)
+	if rr.Code != http.StatusCreated {
+		t.Fatalf("got %d, want 201 — %s", rr.Code, rr.Body.String())
+	}
+	var e Exchange
+	json.NewDecoder(rr.Body).Decode(&e)
+	if e.Status != "pending" {
+		t.Errorf("status = %q, want pending", e.Status)
+	}
+	if e.RequesterID != requester.ID {
+		t.Errorf("requester_id = %d, want %d", e.RequesterID, requester.ID)
+	}
+}
+
+func TestHandleListExchanges_MissingUserID(t *testing.T) {
+	req := httptest.NewRequest(http.MethodGet, "/api/exchanges", nil)
+	rr := httptest.NewRecorder()
+	handleListExchanges(nil)(rr, req)
+	if rr.Code != http.StatusBadRequest {
+		t.Errorf("got %d, want 400", rr.Code)
+	}
+}
+
+func TestHandleListExchanges_Empty(t *testing.T) {
+	db := setupTestDB(t)
+	u := createTestUser(t, db, "list-exch-empty")
+	req := httptest.NewRequest(http.MethodGet, "/api/exchanges", nil)
+	req.Header.Set("X-User-ID", fmt.Sprint(u.ID))
+	rr := httptest.NewRecorder()
+	handleListExchanges(db)(rr, req)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("got %d, want 200", rr.Code)
+	}
+	var exchanges []Exchange
+	json.NewDecoder(rr.Body).Decode(&exchanges)
+	if len(exchanges) != 0 {
+		t.Errorf("len = %d, want 0", len(exchanges))
+	}
+}
+
+func TestHandleListExchanges_FilterByStatus(t *testing.T) {
+	db := setupTestDB(t)
+	owner := createTestUser(t, db, "list-owner")
+	requester := createTestUser(t, db, "list-requester")
+	svc := createTestService(t, db, owner.ID, "Couture")
+	createTestExchange(t, db, requester.ID, svc.ID)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/exchanges?status=pending", nil)
+	req.Header.Set("X-User-ID", fmt.Sprint(requester.ID))
+	rr := httptest.NewRecorder()
+	handleListExchanges(db)(rr, req)
+	var exchanges []Exchange
+	json.NewDecoder(rr.Body).Decode(&exchanges)
+	if len(exchanges) != 1 {
+		t.Errorf("len = %d, want 1", len(exchanges))
+	}
+}
+
+func TestHandleGetExchange_InvalidID(t *testing.T) {
+	req := httptest.NewRequest(http.MethodGet, "/api/exchanges/abc", nil)
+	req.SetPathValue("id", "abc")
+	rr := httptest.NewRecorder()
+	handleGetExchange(nil)(rr, req)
+	if rr.Code != http.StatusBadRequest {
+		t.Errorf("got %d, want 400", rr.Code)
+	}
+}
+
+func TestHandleGetExchange_NotFound(t *testing.T) {
+	db := setupTestDB(t)
+	req := httptest.NewRequest(http.MethodGet, "/api/exchanges/999999", nil)
+	req.SetPathValue("id", "999999")
+	rr := httptest.NewRecorder()
+	handleGetExchange(db)(rr, req)
+	if rr.Code != http.StatusNotFound {
+		t.Errorf("got %d, want 404", rr.Code)
+	}
+}
+
+func TestHandleGetExchange_Success(t *testing.T) {
+	db := setupTestDB(t)
+	owner := createTestUser(t, db, "get-exch-owner")
+	requester := createTestUser(t, db, "get-exch-requester")
+	svc := createTestService(t, db, owner.ID, "Bricolage")
+	exchange := createTestExchange(t, db, requester.ID, svc.ID)
+
+	id := fmt.Sprint(exchange.ID)
+	req := httptest.NewRequest(http.MethodGet, "/api/exchanges/"+id, nil)
+	req.SetPathValue("id", id)
+	rr := httptest.NewRecorder()
+	handleGetExchange(db)(rr, req)
+	if rr.Code != http.StatusOK {
+		t.Errorf("got %d, want 200", rr.Code)
+	}
+}
+
+func TestHandleAcceptExchange_Forbidden(t *testing.T) {
+	db := setupTestDB(t)
+	owner := createTestUser(t, db, "accept-owner")
+	requester := createTestUser(t, db, "accept-requester")
+	third := createTestUser(t, db, "accept-third")
+	svc := createTestService(t, db, owner.ID, "Photographie")
+	exchange := createTestExchange(t, db, requester.ID, svc.ID)
+
+	id := fmt.Sprint(exchange.ID)
+	req := httptest.NewRequest(http.MethodPut, "/api/exchanges/"+id+"/accept", nil)
+	req.SetPathValue("id", id)
+	req.Header.Set("X-User-ID", fmt.Sprint(third.ID))
+	rr := httptest.NewRecorder()
+	handleAcceptExchange(db)(rr, req)
+	if rr.Code != http.StatusForbidden {
+		t.Errorf("got %d, want 403", rr.Code)
+	}
+}
+
+func TestHandleAcceptExchange_WrongStatus(t *testing.T) {
+	db := setupTestDB(t)
+	owner := createTestUser(t, db, "accept-wrong-owner")
+	requester := createTestUser(t, db, "accept-wrong-requester")
+	svc := createTestService(t, db, owner.ID, "Langues")
+	exchange := createTestExchange(t, db, requester.ID, svc.ID)
+	acceptTestExchange(t, db, exchange.ID, owner.ID)
+
+	id := fmt.Sprint(exchange.ID)
+	req := httptest.NewRequest(http.MethodPut, "/api/exchanges/"+id+"/accept", nil)
+	req.SetPathValue("id", id)
+	req.Header.Set("X-User-ID", fmt.Sprint(owner.ID))
+	rr := httptest.NewRecorder()
+	handleAcceptExchange(db)(rr, req)
+	if rr.Code != http.StatusBadRequest {
+		t.Errorf("got %d, want 400", rr.Code)
+	}
+}
+
+func TestHandleAcceptExchange_Success(t *testing.T) {
+	db := setupTestDB(t)
+	owner := createTestUser(t, db, "accept-ok-owner")
+	requester := createTestUser(t, db, "accept-ok-requester")
+	svc := createTestService(t, db, owner.ID, "Animalier")
+	exchange := createTestExchange(t, db, requester.ID, svc.ID)
+
+	id := fmt.Sprint(exchange.ID)
+	req := httptest.NewRequest(http.MethodPut, "/api/exchanges/"+id+"/accept", nil)
+	req.SetPathValue("id", id)
+	req.Header.Set("X-User-ID", fmt.Sprint(owner.ID))
+	rr := httptest.NewRecorder()
+	handleAcceptExchange(db)(rr, req)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("got %d, want 200 — %s", rr.Code, rr.Body.String())
+	}
+	var e Exchange
+	json.NewDecoder(rr.Body).Decode(&e)
+	if e.Status != "accepted" {
+		t.Errorf("status = %q, want accepted", e.Status)
+	}
+}
+
+func TestHandleRejectExchange_Forbidden(t *testing.T) {
+	db := setupTestDB(t)
+	owner := createTestUser(t, db, "reject-owner")
+	requester := createTestUser(t, db, "reject-requester")
+	third := createTestUser(t, db, "reject-third")
+	svc := createTestService(t, db, owner.ID, "Cuisine")
+	exchange := createTestExchange(t, db, requester.ID, svc.ID)
+
+	id := fmt.Sprint(exchange.ID)
+	req := httptest.NewRequest(http.MethodPut, "/api/exchanges/"+id+"/reject", nil)
+	req.SetPathValue("id", id)
+	req.Header.Set("X-User-ID", fmt.Sprint(third.ID))
+	rr := httptest.NewRecorder()
+	handleRejectExchange(db)(rr, req)
+	if rr.Code != http.StatusForbidden {
+		t.Errorf("got %d, want 403", rr.Code)
+	}
+}
+
+func TestHandleRejectExchange_Success(t *testing.T) {
+	db := setupTestDB(t)
+	owner := createTestUser(t, db, "reject-ok-owner")
+	requester := createTestUser(t, db, "reject-ok-requester")
+	svc := createTestService(t, db, owner.ID, "Informatique")
+	exchange := createTestExchange(t, db, requester.ID, svc.ID)
+
+	id := fmt.Sprint(exchange.ID)
+	req := httptest.NewRequest(http.MethodPut, "/api/exchanges/"+id+"/reject", nil)
+	req.SetPathValue("id", id)
+	req.Header.Set("X-User-ID", fmt.Sprint(owner.ID))
+	rr := httptest.NewRecorder()
+	handleRejectExchange(db)(rr, req)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("got %d, want 200 — %s", rr.Code, rr.Body.String())
+	}
+	var e Exchange
+	json.NewDecoder(rr.Body).Decode(&e)
+	if e.Status != "rejected" {
+		t.Errorf("status = %q, want rejected", e.Status)
+	}
+}
+
+func TestHandleCancelExchange_Forbidden(t *testing.T) {
+	db := setupTestDB(t)
+	owner := createTestUser(t, db, "cancel-owner")
+	requester := createTestUser(t, db, "cancel-requester")
+	third := createTestUser(t, db, "cancel-third")
+	svc := createTestService(t, db, owner.ID, "Déménagement")
+	exchange := createTestExchange(t, db, requester.ID, svc.ID)
+	acceptTestExchange(t, db, exchange.ID, owner.ID)
+
+	id := fmt.Sprint(exchange.ID)
+	req := httptest.NewRequest(http.MethodPut, "/api/exchanges/"+id+"/cancel", nil)
+	req.SetPathValue("id", id)
+	req.Header.Set("X-User-ID", fmt.Sprint(third.ID))
+	rr := httptest.NewRecorder()
+	handleCancelExchange(db)(rr, req)
+	if rr.Code != http.StatusForbidden {
+		t.Errorf("got %d, want 403", rr.Code)
+	}
+}
+
+func TestHandleCancelExchange_WrongStatus(t *testing.T) {
+	db := setupTestDB(t)
+	owner := createTestUser(t, db, "cancel-wrong-owner")
+	requester := createTestUser(t, db, "cancel-wrong-requester")
+	svc := createTestService(t, db, owner.ID, "Sport")
+	exchange := createTestExchange(t, db, requester.ID, svc.ID)
+
+	id := fmt.Sprint(exchange.ID)
+	req := httptest.NewRequest(http.MethodPut, "/api/exchanges/"+id+"/cancel", nil)
+	req.SetPathValue("id", id)
+	req.Header.Set("X-User-ID", fmt.Sprint(requester.ID))
+	rr := httptest.NewRecorder()
+	handleCancelExchange(db)(rr, req)
+	if rr.Code != http.StatusBadRequest {
+		t.Errorf("got %d, want 400", rr.Code)
+	}
+}
+
+func TestHandleCancelExchange_Success(t *testing.T) {
+	db := setupTestDB(t)
+	owner := createTestUser(t, db, "cancel-ok-owner")
+	requester := createTestUser(t, db, "cancel-ok-requester")
+	svc := createTestService(t, db, owner.ID, "Jardinage")
+	exchange := createTestExchange(t, db, requester.ID, svc.ID)
+	acceptTestExchange(t, db, exchange.ID, owner.ID)
+
+	id := fmt.Sprint(exchange.ID)
+	req := httptest.NewRequest(http.MethodPut, "/api/exchanges/"+id+"/cancel", nil)
+	req.SetPathValue("id", id)
+	req.Header.Set("X-User-ID", fmt.Sprint(requester.ID))
+	rr := httptest.NewRecorder()
+	handleCancelExchange(db)(rr, req)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("got %d, want 200 — %s", rr.Code, rr.Body.String())
+	}
+	var e Exchange
+	json.NewDecoder(rr.Body).Decode(&e)
+	if e.Status != "cancelled" {
+		t.Errorf("status = %q, want cancelled", e.Status)
+	}
+}
+
+func TestHandleCompleteExchange_Forbidden(t *testing.T) {
+	db := setupTestDB(t)
+	owner := createTestUser(t, db, "complete-owner")
+	requester := createTestUser(t, db, "complete-requester")
+	svc := createTestService(t, db, owner.ID, "Bricolage")
+	exchange := createTestExchange(t, db, requester.ID, svc.ID)
+	acceptTestExchange(t, db, exchange.ID, owner.ID)
+
+	id := fmt.Sprint(exchange.ID)
+	req := httptest.NewRequest(http.MethodPut, "/api/exchanges/"+id+"/complete", nil)
+	req.SetPathValue("id", id)
+	req.Header.Set("X-User-ID", fmt.Sprint(owner.ID))
+	rr := httptest.NewRecorder()
+	handleCompleteExchange(db)(rr, req)
+	if rr.Code != http.StatusForbidden {
+		t.Errorf("got %d, want 403", rr.Code)
+	}
+}
+
+func TestHandleCompleteExchange_Success(t *testing.T) {
+	db := setupTestDB(t)
+	owner := createTestUser(t, db, "complete-ok-owner")
+	requester := createTestUser(t, db, "complete-ok-requester")
+	svc := createTestService(t, db, owner.ID, "Photographie")
+	exchange := createTestExchange(t, db, requester.ID, svc.ID)
+	acceptTestExchange(t, db, exchange.ID, owner.ID)
+
+	id := fmt.Sprint(exchange.ID)
+	req := httptest.NewRequest(http.MethodPut, "/api/exchanges/"+id+"/complete", nil)
+	req.SetPathValue("id", id)
+	req.Header.Set("X-User-ID", fmt.Sprint(requester.ID))
+	rr := httptest.NewRecorder()
+	handleCompleteExchange(db)(rr, req)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("got %d, want 200 — %s", rr.Code, rr.Body.String())
+	}
+	var e Exchange
+	json.NewDecoder(rr.Body).Decode(&e)
+	if e.Status != "completed" {
+		t.Errorf("status = %q, want completed", e.Status)
+	}
+}
+
+// ---- reviews ----
+
+func TestHandleCreateReview_InvalidBody(t *testing.T) {
+	req := httptest.NewRequest(http.MethodPost, "/api/exchanges/1/review", bytes.NewBufferString("not json"))
+	req.SetPathValue("id", "1")
+	req.Header.Set("X-User-ID", "1")
+	rr := httptest.NewRecorder()
+	handleCreateReview(nil, nil)(rr, req)
+	if rr.Code != http.StatusBadRequest {
+		t.Errorf("got %d, want 400", rr.Code)
+	}
+}
+
+func TestHandleCreateReview_InvalidNote(t *testing.T) {
+	body, _ := json.Marshal(ReviewRequest{Note: 6})
+	req := httptest.NewRequest(http.MethodPost, "/api/exchanges/1/review", bytes.NewReader(body))
+	req.SetPathValue("id", "1")
+	req.Header.Set("X-User-ID", "1")
+	rr := httptest.NewRecorder()
+	handleCreateReview(nil, nil)(rr, req)
+	if rr.Code != http.StatusBadRequest {
+		t.Errorf("got %d, want 400", rr.Code)
+	}
+}
+
+func TestHandleCreateReview_NotCompleted(t *testing.T) {
+	db := setupTestDB(t)
+	owner := createTestUser(t, db, "review-nc-owner")
+	requester := createTestUser(t, db, "review-nc-requester")
+	svc := createTestService(t, db, owner.ID, "Langues")
+	exchange := createTestExchange(t, db, requester.ID, svc.ID)
+
+	body, _ := json.Marshal(ReviewRequest{Note: 5, Commentaire: "Super"})
+	id := fmt.Sprint(exchange.ID)
+	req := httptest.NewRequest(http.MethodPost, "/api/exchanges/"+id+"/review", bytes.NewReader(body))
+	req.SetPathValue("id", id)
+	req.Header.Set("X-User-ID", fmt.Sprint(requester.ID))
+	rr := httptest.NewRecorder()
+	handleCreateReview(db, db)(rr, req)
+	if rr.Code != http.StatusBadRequest {
+		t.Errorf("got %d, want 400", rr.Code)
+	}
+}
+
+func TestHandleCreateReview_Forbidden(t *testing.T) {
+	db := setupTestDB(t)
+	owner := createTestUser(t, db, "review-forbidden-owner")
+	requester := createTestUser(t, db, "review-forbidden-requester")
+	third := createTestUser(t, db, "review-forbidden-third")
+	svc := createTestService(t, db, owner.ID, "Musique")
+	exchange := createTestExchange(t, db, requester.ID, svc.ID)
+	acceptTestExchange(t, db, exchange.ID, owner.ID)
+	completeTestExchange(t, db, exchange.ID, requester.ID)
+
+	body, _ := json.Marshal(ReviewRequest{Note: 4})
+	id := fmt.Sprint(exchange.ID)
+	req := httptest.NewRequest(http.MethodPost, "/api/exchanges/"+id+"/review", bytes.NewReader(body))
+	req.SetPathValue("id", id)
+	req.Header.Set("X-User-ID", fmt.Sprint(third.ID))
+	rr := httptest.NewRecorder()
+	handleCreateReview(db, db)(rr, req)
+	if rr.Code != http.StatusForbidden {
+		t.Errorf("got %d, want 403", rr.Code)
+	}
+}
+
+func TestHandleCreateReview_Success(t *testing.T) {
+	db := setupTestDB(t)
+	owner := createTestUser(t, db, "review-ok-owner")
+	requester := createTestUser(t, db, "review-ok-requester")
+	svc := createTestService(t, db, owner.ID, "Sport")
+	exchange := createTestExchange(t, db, requester.ID, svc.ID)
+	acceptTestExchange(t, db, exchange.ID, owner.ID)
+	completeTestExchange(t, db, exchange.ID, requester.ID)
+
+	body, _ := json.Marshal(ReviewRequest{Note: 5, Commentaire: "Excellent"})
+	id := fmt.Sprint(exchange.ID)
+	req := httptest.NewRequest(http.MethodPost, "/api/exchanges/"+id+"/review", bytes.NewReader(body))
+	req.SetPathValue("id", id)
+	req.Header.Set("X-User-ID", fmt.Sprint(requester.ID))
+	rr := httptest.NewRecorder()
+	handleCreateReview(db, db)(rr, req)
+	if rr.Code != http.StatusCreated {
+		t.Fatalf("got %d, want 201 — %s", rr.Code, rr.Body.String())
+	}
+	var r Review
+	json.NewDecoder(rr.Body).Decode(&r)
+	if r.Note != 5 {
+		t.Errorf("note = %d, want 5", r.Note)
+	}
+	if r.TargetID != owner.ID {
+		t.Errorf("target_id = %d, want %d", r.TargetID, owner.ID)
+	}
+}
+
+func TestHandleCreateReview_AlreadyReviewed(t *testing.T) {
+	db := setupTestDB(t)
+	owner := createTestUser(t, db, "review-dup-owner")
+	requester := createTestUser(t, db, "review-dup-requester")
+	svc := createTestService(t, db, owner.ID, "Tutorat")
+	exchange := createTestExchange(t, db, requester.ID, svc.ID)
+	acceptTestExchange(t, db, exchange.ID, owner.ID)
+	completeTestExchange(t, db, exchange.ID, requester.ID)
+
+	id := fmt.Sprint(exchange.ID)
+	doReview := func() int {
+		body, _ := json.Marshal(ReviewRequest{Note: 4})
+		req := httptest.NewRequest(http.MethodPost, "/api/exchanges/"+id+"/review", bytes.NewReader(body))
+		req.SetPathValue("id", id)
+		req.Header.Set("X-User-ID", fmt.Sprint(requester.ID))
+		rr := httptest.NewRecorder()
+		handleCreateReview(db, db)(rr, req)
+		return rr.Code
+	}
+	if code := doReview(); code != http.StatusCreated {
+		t.Fatalf("first review: got %d, want 201", code)
+	}
+	if code := doReview(); code != http.StatusBadRequest {
+		t.Errorf("second review: got %d, want 400", code)
+	}
+}
+
+func TestHandleGetUserReviews_Empty(t *testing.T) {
+	db := setupTestDB(t)
+	u := createTestUser(t, db, "reviews-empty-user")
+	id := fmt.Sprint(u.ID)
+	req := httptest.NewRequest(http.MethodGet, "/api/users/"+id+"/reviews", nil)
+	req.SetPathValue("id", id)
+	rr := httptest.NewRecorder()
+	handleGetUserReviews(db)(rr, req)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("got %d, want 200", rr.Code)
+	}
+	var reviews []Review
+	json.NewDecoder(rr.Body).Decode(&reviews)
+	if len(reviews) != 0 {
+		t.Errorf("len = %d, want 0", len(reviews))
+	}
+}
+
+func TestHandleGetUserReviews_Success(t *testing.T) {
+	db := setupTestDB(t)
+	owner := createTestUser(t, db, "user-reviews-owner")
+	requester := createTestUser(t, db, "user-reviews-requester")
+	svc := createTestService(t, db, owner.ID, "Couture")
+	exchange := createTestExchange(t, db, requester.ID, svc.ID)
+	acceptTestExchange(t, db, exchange.ID, owner.ID)
+	completeTestExchange(t, db, exchange.ID, requester.ID)
+
+	body, _ := json.Marshal(ReviewRequest{Note: 4, Commentaire: "Bien"})
+	id := fmt.Sprint(exchange.ID)
+	req := httptest.NewRequest(http.MethodPost, "/api/exchanges/"+id+"/review", bytes.NewReader(body))
+	req.SetPathValue("id", id)
+	req.Header.Set("X-User-ID", fmt.Sprint(requester.ID))
+	rr := httptest.NewRecorder()
+	handleCreateReview(db, db)(rr, req)
+	if rr.Code != http.StatusCreated {
+		t.Fatalf("createReview: got %d — %s", rr.Code, rr.Body.String())
+	}
+
+	ownerID := fmt.Sprint(owner.ID)
+	req = httptest.NewRequest(http.MethodGet, "/api/users/"+ownerID+"/reviews", nil)
+	req.SetPathValue("id", ownerID)
+	rr = httptest.NewRecorder()
+	handleGetUserReviews(db)(rr, req)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("got %d, want 200", rr.Code)
+	}
+	var reviews []Review
+	json.NewDecoder(rr.Body).Decode(&reviews)
+	if len(reviews) != 1 {
+		t.Errorf("len = %d, want 1", len(reviews))
+	}
+}
+
+func TestHandleGetServiceReviews_Empty(t *testing.T) {
+	db := setupTestDB(t)
+	owner := createTestUser(t, db, "svc-reviews-empty-owner")
+	svc := createTestService(t, db, owner.ID, "Autre")
+	id := fmt.Sprint(svc.ID)
+	req := httptest.NewRequest(http.MethodGet, "/api/services/"+id+"/reviews", nil)
+	req.SetPathValue("id", id)
+	rr := httptest.NewRecorder()
+	handleGetServiceReviews(db)(rr, req)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("got %d, want 200", rr.Code)
+	}
+	var reviews []Review
+	json.NewDecoder(rr.Body).Decode(&reviews)
+	if len(reviews) != 0 {
+		t.Errorf("len = %d, want 0", len(reviews))
+	}
+}
+
+func TestHandleGetServiceReviews_Success(t *testing.T) {
+	db := setupTestDB(t)
+	owner := createTestUser(t, db, "svc-reviews-owner")
+	requester := createTestUser(t, db, "svc-reviews-requester")
+	svc := createTestService(t, db, owner.ID, "Informatique")
+	exchange := createTestExchange(t, db, requester.ID, svc.ID)
+	acceptTestExchange(t, db, exchange.ID, owner.ID)
+	completeTestExchange(t, db, exchange.ID, requester.ID)
+
+	body, _ := json.Marshal(ReviewRequest{Note: 3, Commentaire: "Correct"})
+	id := fmt.Sprint(exchange.ID)
+	req := httptest.NewRequest(http.MethodPost, "/api/exchanges/"+id+"/review", bytes.NewReader(body))
+	req.SetPathValue("id", id)
+	req.Header.Set("X-User-ID", fmt.Sprint(requester.ID))
+	rr := httptest.NewRecorder()
+	handleCreateReview(db, db)(rr, req)
+	if rr.Code != http.StatusCreated {
+		t.Fatalf("createReview: got %d — %s", rr.Code, rr.Body.String())
+	}
+
+	svcID := fmt.Sprint(svc.ID)
+	req = httptest.NewRequest(http.MethodGet, "/api/services/"+svcID+"/reviews", nil)
+	req.SetPathValue("id", svcID)
+	rr = httptest.NewRecorder()
+	handleGetServiceReviews(db)(rr, req)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("got %d, want 200", rr.Code)
+	}
+	var reviews []Review
+	json.NewDecoder(rr.Body).Decode(&reviews)
+	if len(reviews) != 1 {
+		t.Errorf("len = %d, want 1", len(reviews))
+	}
+}
+
+// ---- stats ----
+
+func TestHandleGetUserStats_InvalidID(t *testing.T) {
+	req := httptest.NewRequest(http.MethodGet, "/api/users/abc/stats", nil)
+	req.SetPathValue("id", "abc")
+	rr := httptest.NewRecorder()
+	handleGetUserStats(nil)(rr, req)
+	if rr.Code != http.StatusBadRequest {
+		t.Errorf("got %d, want 400", rr.Code)
+	}
+}
+
+func TestHandleGetUserStats_NotFound(t *testing.T) {
+	db := setupTestDB(t)
+	req := httptest.NewRequest(http.MethodGet, "/api/users/999999/stats", nil)
+	req.SetPathValue("id", "999999")
+	rr := httptest.NewRecorder()
+	handleGetUserStats(db)(rr, req)
+	if rr.Code != http.StatusNotFound {
+		t.Errorf("got %d, want 404", rr.Code)
+	}
+}
+
+func TestHandleGetUserStats_Success(t *testing.T) {
+	db := setupTestDB(t)
+	owner := createTestUser(t, db, "stats-owner")
+	requester := createTestUser(t, db, "stats-requester")
+	svc := createTestService(t, db, owner.ID, "Jardinage")
+	exchange := createTestExchange(t, db, requester.ID, svc.ID)
+	acceptTestExchange(t, db, exchange.ID, owner.ID)
+	completeTestExchange(t, db, exchange.ID, requester.ID)
+
+	body, _ := json.Marshal(ReviewRequest{Note: 5})
+	id := fmt.Sprint(exchange.ID)
+	req := httptest.NewRequest(http.MethodPost, "/api/exchanges/"+id+"/review", bytes.NewReader(body))
+	req.SetPathValue("id", id)
+	req.Header.Set("X-User-ID", fmt.Sprint(requester.ID))
+	handleCreateReview(db, db)(httptest.NewRecorder(), req)
+
+	ownerID := fmt.Sprint(owner.ID)
+	req = httptest.NewRequest(http.MethodGet, "/api/users/"+ownerID+"/stats", nil)
+	req.SetPathValue("id", ownerID)
+	rr := httptest.NewRecorder()
+	handleGetUserStats(db)(rr, req)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("got %d, want 200 — %s", rr.Code, rr.Body.String())
+	}
+	var stats UserStats
+	json.NewDecoder(rr.Body).Decode(&stats)
+	if stats.UserID != owner.ID {
+		t.Errorf("user_id = %d, want %d", stats.UserID, owner.ID)
+	}
+	if stats.EchangesCompletes != 1 {
+		t.Errorf("echanges_completes = %d, want 1", stats.EchangesCompletes)
+	}
+	if stats.TotalGagne != 2 {
+		t.Errorf("total_gagne = %d, want 2", stats.TotalGagne)
+	}
+	if stats.NbAvis != 1 {
+		t.Errorf("nb_avis = %d, want 1", stats.NbAvis)
+	}
+	if stats.NoteMoyenne != 5.0 {
+		t.Errorf("note_moyenne = %f, want 5.0", stats.NoteMoyenne)
 	}
 }

@@ -59,3 +59,51 @@ func handleCreateReview(exchangeStore ExchangeStore, reviewStore ReviewStore) ht
 		respondJSON(w, http.StatusCreated, review)
 	}
 }
+
+func handleGetUserReviews(reviewStore ReviewStore) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		id, err := parseID(r)
+		if err != nil {
+			errBadRequest(w, "Invalid id")
+			return
+		}
+
+		ctx, cancel := newCtx(r)
+		defer cancel()
+
+		reviews, err := reviewStore.GetReviewsByUserID(ctx, id)
+		if err != nil {
+			errInternal(w)
+			return
+		}
+		if reviews == nil {
+			reviews = []Review{}
+		}
+
+		respondJSON(w, http.StatusOK, reviews)
+	}
+}
+
+func handleGetServiceReviews(reviewStore ReviewStore) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		id, err := parseID(r)
+		if err != nil {
+			errBadRequest(w, "Invalid id")
+			return
+		}
+
+		ctx, cancel := newCtx(r)
+		defer cancel()
+
+		reviews, err := reviewStore.GetReviewsByServiceID(ctx, id)
+		if err != nil {
+			errInternal(w)
+			return
+		}
+		if reviews == nil {
+			reviews = []Review{}
+		}
+
+		respondJSON(w, http.StatusOK, reviews)
+	}
+}

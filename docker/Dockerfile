@@ -1,10 +1,14 @@
-FROM golang:1.26
+FROM golang:1.26-alpine
 
-
-RUN groupadd -g 1000 go && useradd -d /home/go -g 1000 -m go
-
-USER go
+RUN addgroup -g 1000 go && adduser -D -h /home/go -G go -u 1000 go
 
 WORKDIR /home/go
+
+COPY go.mod go.sum ./
+RUN go mod download
+
+COPY --chown=go:go . .
+
+USER go
 
 CMD ["go", "run", "."]
