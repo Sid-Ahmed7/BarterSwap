@@ -141,7 +141,7 @@ func handleUpdateService(store ServiceStore) http.HandlerFunc {
 	}
 }
 
-func handleDeleteService(store ServiceStore) http.HandlerFunc {
+func handleDeleteService(store ServiceStore, exchangeStore ExchangeStore) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		id, err := parseID(r)
 		if err != nil {
@@ -168,6 +168,16 @@ func handleDeleteService(store ServiceStore) http.HandlerFunc {
 		}
 		if svc.ProviderID != userID {
 			errForbidden(w)
+			return
+		}
+
+		hasActive, err := exchangeStore.HasActiveExchange(ctx, id)
+		if err != nil {
+			errInternal(w)
+			return
+		}
+		if hasActive {
+			errConflict(w, "Service has an active exchange")
 			return
 		}
 

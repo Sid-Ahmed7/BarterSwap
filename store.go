@@ -38,4 +38,8 @@ type ReviewStore interface {
 	GetReviewsByUserID(ctx context.Context, userID int) ([]Review, error)
 	GetReviewsByServiceID(ctx context.Context, serviceID int) ([]Review, error)
 }
+
+type StatsStore interface {
+	GetUserStats(ctx context.Context, userID int) (UserStats, error)
+}
 type DB struct{ *sql.DB }

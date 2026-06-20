@@ -9,12 +9,22 @@ import (
 	"github.com/lib/pq"
 )
 
+// ErrNotFound is returned when a requested resource does not exist.
 var ErrNotFound = errors.New("not found")
+
+// ErrInsufficientCredits is returned when the requester lacks enough credits.
 var ErrInsufficientCredits = errors.New("insufficient credits")
+
+// ErrAlreadyReviewed is returned when a user tries to review an exchange twice.
 var ErrAlreadyReviewed = errors.New("already reviewed")
+
+// ErrNotCompleted is returned when a review is attempted on a non-completed exchange.
 var ErrNotCompleted = errors.New("exchange not completed")
+
+// ErrForbidden is returned when a user tries to act on a resource they do not own.
 var ErrForbidden = errors.New("forbidden")
 
+// ValidationError is returned when a request field fails validation.
 type ValidationError struct {
 	Field   string
 	Message string

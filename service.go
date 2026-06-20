@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"strings"
 )
 
@@ -35,6 +36,104 @@ func validateSkills(skills []Skill) error {
 		}
 	}
 	return nil
+}
+
+func validateExchangeCreation(requesterID int, service Service, requesterCredits int) error {
+	if service.ProviderID == requesterID {
+		return ValidationError{Field: "service_id", Message: "cannot request your own service"}
+	}
+	if requesterCredits < service.Credits {
+		return ErrInsufficientCredits
+	}
+	return nil
+}
+
+func processAcceptExchange(ctx context.Context, db *DB, id int) (Exchange, error) {
+	tx, err := db.BeginTx(ctx, nil)
+	if err != nil {
+		return Exchange{}, err
+	}
+	defer tx.Rollback()
+
+	e, err := getExchange(ctx, tx, id)
+	if err != nil {
+		return e, err
+	}
+	credits, err := getServiceCredits(ctx, tx, e.ServiceID)
+	if err != nil {
+		return e, err
+	}
+	result, err := tx.ExecContext(ctx, queryDeductCredits, e.RequesterID, credits)
+	if err != nil {
+		return e, err
+	}
+	if rows, _ := result.RowsAffected(); rows == 0 {
+		return e, ErrInsufficientCredits
+	}
+	if err = scanExchange(tx.QueryRowContext(ctx, queryUpdateExchangeStatus, id, "accepted"), &e); err != nil {
+		return e, err
+	}
+	if _, err = tx.ExecContext(ctx, queryInsertCreditTransaction, e.RequesterID, id, -credits, "spend"); err != nil {
+		return e, err
+	}
+	return e, tx.Commit()
+}
+
+// processCompleteExchange transfers credits to the owner and marks the exchange as completed.
+func processCompleteExchange(ctx context.Context, db *DB, id int) (Exchange, error) {
+	tx, err := db.BeginTx(ctx, nil)
+	if err != nil {
+		return Exchange{}, err
+	}
+	defer tx.Rollback()
+
+	e, err := getExchange(ctx, tx, id)
+	if err != nil {
+		return e, err
+	}
+	credits, err := getServiceCredits(ctx, tx, e.ServiceID)
+	if err != nil {
+		return e, err
+	}
+	if _, err = tx.ExecContext(ctx, queryAddCredits, e.OwnerID, credits); err != nil {
+		return e, err
+	}
+	if _, err = tx.ExecContext(ctx, queryInsertCreditTransaction, e.OwnerID, id, credits, "earn"); err != nil {
+		return e, err
+	}
+	if err = scanExchange(tx.QueryRowContext(ctx, queryUpdateExchangeStatus, id, "completed"), &e); err != nil {
+		return e, err
+	}
+	return e, tx.Commit()
+}
+
+func processCancelExchange(ctx context.Context, db *DB, id int) (Exchange, error) {
+	tx, err := db.BeginTx(ctx, nil)
+	if err != nil {
+		return Exchange{}, err
+	}
+	defer tx.Rollback()
+
+	e, err := getExchange(ctx, tx, id)
+	if err != nil {
+		return e, err
+	}
+	if e.Status == "accepted" {
+		credits, err := getServiceCredits(ctx, tx, e.ServiceID)
+		if err != nil {
+			return e, err
+		}
+		if _, err = tx.ExecContext(ctx, queryAddCredits, e.RequesterID, credits); err != nil {
+			return e, err
+		}
+		if _, err = tx.ExecContext(ctx, queryInsertCreditTransaction, e.RequesterID, id, credits, "refund"); err != nil {
+			return e, err
+		}
+	}
+	if err = scanExchange(tx.QueryRowContext(ctx, queryUpdateExchangeStatus, id, "cancelled"), &e); err != nil {
+		return e, err
+	}
+	return e, tx.Commit()
 }
 
 func validateServiceRequest(r ServiceRequest) error {

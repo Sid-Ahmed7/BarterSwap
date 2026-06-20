@@ -21,7 +21,7 @@ const (
 	queryUpdateService = `UPDATE services SET titre=$2, description=$3, categorie=$4, duree_minutes=$5, credits=$6, ville=$7 WHERE id=$1
     RETURNING id, provider_id, titre, COALESCE(description,''), categorie, duree_minutes, credits, COALESCE(ville,''), actif, created_at`
 
-	queryDeleteService = `DELETE FROM services WHERE id = $1`
+	queryDeleteService = `UPDATE services SET actif = false WHERE id = $1`
 
 	queryHasSkillForCategory = `SELECT COUNT(*) FROM skills WHERE user_id = $1 AND nom = $2`
 
@@ -48,4 +48,8 @@ const (
 	queryGetReviewsByUserID = `SELECT id, exchange_id, author_id, target_id, note, COALESCE(commentaire, ''), created_at FROM reviews WHERE target_id = $1`
 
 	queryGetReviewsByServiceID = `SELECT r.id, r.exchange_id, r.author_id, r.target_id, r.note, COALESCE(r.commentaire, ''), r.created_at FROM reviews r JOIN exchanges e ON r.exchange_id = e.id WHERE e.service_id = $1`
+	queryGetUserStats          = `SELECT u.id, COUNT(DISTINCT s.id) FILTER (WHERE s.actif = true) AS services_actifs, COUNT(DISTINCT e.id) FILTER (WHERE e.status = 'completed') AS echanges_completes,
+								u.credit_balance, COALESCE(AVG(r.note), 0) AS note_moyenne, COUNT(DISTINCT r.id) AS nb_avis, COALESCE(SUM(ct.montant) FILTER (WHERE ct.montant > 0 AND ct.user_id = u.id), 0) AS total_gagne,
+								COALESCE(ABS(SUM(ct.montant) FILTER (WHERE ct.montant < 0 AND ct.user_id = u.id)), 0) AS total_depense FROM users u LEFT JOIN services s ON s.provider_id = u.id LEFT JOIN exchanges e ON (e.requester_id = u.id OR e.owner_id = u.id)
+								LEFT JOIN reviews r ON r.target_id = u.id LEFT JOIN credit_transactions ct ON ct.user_id = u.id WHERE u.id = $1 GROUP BY u.id, u.credit_balance`
 )
