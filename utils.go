@@ -15,3 +15,7 @@ func scanService(row *sql.Row, s *Service) error {
 func scanExchange(row *sql.Row, e *Exchange) error {
 	return row.Scan(&e.ID, &e.ServiceID, &e.RequesterID, &e.OwnerID, &e.Status, &e.CreatedAt, &e.UpdatedAt)
 }
+
+func scanReview(row *sql.Row, r *Review) error {
+	return row.Scan(&r.ID, &r.ExchangeID, &r.AuthorID, &r.TargetID, &r.Note, &r.Commentaire, &r.CreatedAt)
+}
