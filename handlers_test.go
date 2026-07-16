@@ -1220,8 +1220,8 @@ func TestHandleCreateReview_AlreadyReviewed(t *testing.T) {
 	if code := doReview(); code != http.StatusCreated {
 		t.Fatalf("first review: got %d, want 201", code)
 	}
-	if code := doReview(); code != http.StatusBadRequest {
-		t.Errorf("second review: got %d, want 400", code)
+	if code := doReview(); code != http.StatusConflict {
+		t.Errorf("second review: got %d, want 409", code)
 	}
 }
 

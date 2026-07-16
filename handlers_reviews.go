@@ -48,7 +48,7 @@ func handleCreateReview(exchangeStore ExchangeStore, reviewStore ReviewStore) ht
 			return
 		}
 		if errors.Is(err, ErrAlreadyReviewed) {
-			errBadRequest(w, "You already reviewed this exchange")
+			errConflict(w, "You already reviewed this exchange")
 			return
 		}
 		if err != nil {
