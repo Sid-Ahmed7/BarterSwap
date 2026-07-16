@@ -42,4 +42,9 @@ type ReviewStore interface {
 type StatsStore interface {
 	GetUserStats(ctx context.Context, userID int) (UserStats, error)
 }
+
+type HealthStore interface {
+	PingContext(ctx context.Context) error
+}
+
 type DB struct{ *sql.DB }
