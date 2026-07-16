@@ -51,7 +51,7 @@ func (db *DB) HasActiveExchange(ctx context.Context, serviceID int) (bool, error
 
 func getExchange(ctx context.Context, tx *sql.Tx, id int) (Exchange, error) {
 	var e Exchange
-	if err := scanExchange(tx.QueryRowContext(ctx, queryGetExchangeByID, id), &e); err != nil {
+	if err := scanExchange(tx.QueryRowContext(ctx, queryGetExchangeByID+" FOR UPDATE", id), &e); err != nil {
 		return e, mapErrNotFound(err)
 	}
 	return e, nil

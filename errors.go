@@ -19,6 +19,8 @@ var ErrNotCompleted = errors.New("exchange not completed")
 
 var ErrForbidden = errors.New("forbidden")
 
+var ErrBadStatus = errors.New("bad status")
+
 type ValidationError struct {
 	Field   string
 	Message string

@@ -59,6 +59,9 @@ func processAcceptExchange(ctx context.Context, db *DB, id int) (Exchange, error
 	if err != nil {
 		return e, err
 	}
+	if e.Status != "pending" {
+		return e, ErrBadStatus
+	}
 	credits, err := getServiceCredits(ctx, tx, e.ServiceID)
 	if err != nil {
 		return e, err
@@ -90,6 +93,9 @@ func processCompleteExchange(ctx context.Context, db *DB, id int) (Exchange, err
 	e, err := getExchange(ctx, tx, id)
 	if err != nil {
 		return e, err
+	}
+	if e.Status != "accepted" {
+		return e, ErrBadStatus
 	}
 	credits, err := getServiceCredits(ctx, tx, e.ServiceID)
 	if err != nil {
