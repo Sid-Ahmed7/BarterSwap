@@ -681,8 +681,6 @@ func TestHandleListServices_Search(t *testing.T) {
 	}
 }
 
-// ---- helpers exchange/review/stats ----
-
 func createTestService(t *testing.T, db *DB, userID int, categorie string) Service {
 	t.Helper()
 	setSkills(t, db, userID, []Skill{{Nom: categorie, Niveau: "expert"}})
@@ -745,8 +743,6 @@ func completeTestExchange(t *testing.T, db *DB, exchangeID, requesterID int) Exc
 	json.NewDecoder(rr.Body).Decode(&e)
 	return e
 }
-
-// ---- exchanges ----
 
 func TestHandleCreateExchange_MissingUserID(t *testing.T) {
 	body, _ := json.Marshal(ExchangeRequest{ServiceID: 1})
@@ -1152,8 +1148,6 @@ func TestHandleCompleteExchange_Success(t *testing.T) {
 	}
 }
 
-// ---- reviews ----
-
 func TestHandleCreateReview_InvalidBody(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/api/exchanges/1/review", bytes.NewBufferString("not json"))
 	req.SetPathValue("id", "1")
@@ -1380,8 +1374,6 @@ func TestHandleGetServiceReviews_Success(t *testing.T) {
 		t.Errorf("len = %d, want 1", len(reviews))
 	}
 }
-
-// ---- stats ----
 
 func TestHandleGetUserStats_InvalidID(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/api/users/abc/stats", nil)
