@@ -90,6 +90,7 @@ func handleListServices(store ServiceStore) http.HandlerFunc {
 			Search:    query.Get("search"),
 			Limit:     limit,
 			Offset:    offset,
+			Sort:      query.Get("sort"),
 		})
 		if err != nil {
 			errInternal(w)

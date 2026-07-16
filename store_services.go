@@ -60,7 +60,18 @@ func (db *DB) ListServices(ctx context.Context, filter ServiceListRequest) ([]Se
 		args = append(args, pattern, pattern)
 		i += 2
 	}
-	query += " ORDER BY created_at DESC"
+	orderClause := "ORDER BY created_at DESC"
+	switch filter.Sort {
+	case "credits_asc":
+		orderClause = "ORDER BY credits ASC"
+	case "credits_desc":
+		orderClause = "ORDER BY credits DESC"
+	case "duree_asc":
+		orderClause = "ORDER BY duree_minutes ASC"
+	case "duree_desc":
+		orderClause = "ORDER BY duree_minutes DESC"
+	}
+	query += " " + orderClause
 	query += fmt.Sprintf(" LIMIT $%d OFFSET $%d", i, i+1)
 	args = append(args, filter.Limit, filter.Offset)
 

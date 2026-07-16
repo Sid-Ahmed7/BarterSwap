@@ -49,6 +49,7 @@ type ServiceListRequest struct {
 	Search    string `json:"search"`
 	Limit     int    `json:"limit"`
 	Offset    int    `json:"offset"`
+	Sort      string `json:"sort"`
 }
 
 type Exchange struct {
