@@ -70,7 +70,11 @@ func processAcceptExchange(ctx context.Context, db *DB, id int) (Exchange, error
 	if err != nil {
 		return e, err
 	}
-	if rows, _ := result.RowsAffected(); rows == 0 {
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return e, err
+	}
+	if rows == 0 {
 		return e, ErrInsufficientCredits
 	}
 	if err = scanExchange(tx.QueryRowContext(ctx, queryUpdateExchangeStatus, id, "accepted"), &e); err != nil {
