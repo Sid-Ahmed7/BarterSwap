@@ -47,6 +47,8 @@ type ServiceListRequest struct {
 	Categorie string `json:"categorie"`
 	Ville     string `json:"ville"`
 	Search    string `json:"search"`
+	Limit     int    `json:"limit"`
+	Offset    int    `json:"offset"`
 }
 
 type Exchange struct {

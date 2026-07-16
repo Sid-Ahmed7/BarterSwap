@@ -61,6 +61,8 @@ func (db *DB) ListServices(ctx context.Context, filter ServiceListRequest) ([]Se
 		i += 2
 	}
 	query += " ORDER BY created_at DESC"
+	query += fmt.Sprintf(" LIMIT $%d OFFSET $%d", i, i+1)
+	args = append(args, filter.Limit, filter.Offset)
 
 	rows, err := db.QueryContext(ctx, query, args...)
 	if err != nil {

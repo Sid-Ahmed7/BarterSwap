@@ -3,6 +3,7 @@ package main
 import (
 	"errors"
 	"net/http"
+	"strconv"
 )
 
 func handleCreateService(store ServiceStore) http.HandlerFunc {
@@ -74,10 +75,21 @@ func handleListServices(store ServiceStore) http.HandlerFunc {
 		ctx, cancel := newCtx(r)
 		defer cancel()
 
+		limit, _ := strconv.Atoi(query.Get("limit"))
+		if limit <= 0 {
+			limit = 20
+		}
+		offset, _ := strconv.Atoi(query.Get("offset"))
+		if offset < 0 {
+			offset = 0
+		}
+
 		services, err := store.ListServices(ctx, ServiceListRequest{
 			Categorie: query.Get("categorie"),
 			Ville:     query.Get("ville"),
 			Search:    query.Get("search"),
+			Limit:     limit,
+			Offset:    offset,
 		})
 		if err != nil {
 			errInternal(w)
