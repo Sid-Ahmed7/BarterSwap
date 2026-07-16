@@ -59,6 +59,10 @@ func handleGetService(store ServiceStore) http.HandlerFunc {
 			errInternal(w)
 			return
 		}
+		if !service.Actif {
+			errNotFound(w)
+			return
+		}
 
 		respondJSON(w, http.StatusOK, service)
 	}
