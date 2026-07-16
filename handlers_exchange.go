@@ -164,6 +164,10 @@ func handleAcceptExchange(exchangeStore ExchangeStore) http.HandlerFunc {
 		}
 
 		exchange, err = exchangeStore.AcceptExchange(ctx, id)
+		if errors.Is(err, ErrBadStatus) {
+			errBadRequest(w, "Only pending exchanges can be accepted")
+			return
+		}
 		if errors.Is(err, ErrInsufficientCredits) {
 			errBadRequest(w, "Insufficient credits")
 			return
@@ -312,6 +316,10 @@ func handleCompleteExchange(exchangeStore ExchangeStore) http.HandlerFunc {
 		}
 
 		updatedExchange, err := exchangeStore.CompleteExchange(ctx, id)
+		if errors.Is(err, ErrBadStatus) {
+			errBadRequest(w, "Only accepted exchanges can be completed")
+			return
+		}
 		if err != nil {
 			errInternal(w)
 			return
