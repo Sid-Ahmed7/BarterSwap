@@ -1,0 +1,1296 @@
+{
+    "swagger": "2.0",
+    "info": {
+        "description": "API REST d'échange de compétences via crédits-temps.",
+        "title": "BarterSwap API",
+        "contact": {},
+        "version": "1.0"
+    },
+    "host": "localhost:8080",
+    "basePath": "/",
+    "paths": {
+        "/api/exchanges": {
+            "get": {
+                "description": "Récupère la liste des demandes d'échanges (en tant que demandeur ou prestataire) pour l'utilisateur connecté, avec filtre par statut optionnel.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Exchanges"
+                ],
+                "summary": "Lister mes échanges",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "ID de l'utilisateur connecté",
+                        "name": "X-User-ID",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Filtrer par statut (pending, accepted, rejected, cancelled, completed)",
+                        "name": "status",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/main.Exchange"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "En-tête manquant",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "description": "Crée une nouvelle demande d'échange pour un service spécifié. L'utilisateur connecté doit disposer d'assez de crédits.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Exchanges"
+                ],
+                "summary": "Créer une demande d'échange",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "ID de l'utilisateur connecté",
+                        "name": "X-User-ID",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "description": "Détails de la demande d'échange",
+                        "name": "exchange",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/main.ExchangeRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/main.Exchange"
+                        }
+                    },
+                    "400": {
+                        "description": "Requête invalide ou crédits insuffisants",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "404": {
+                        "description": "Service ou demandeur non trouvé",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflit (échange déjà actif)",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/exchanges/{id}": {
+            "get": {
+                "description": "Récupère les détails d'un échange par son ID.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Exchanges"
+                ],
+                "summary": "Obtenir le détail d'un échange",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "ID de l'échange",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/main.Exchange"
+                        }
+                    },
+                    "400": {
+                        "description": "ID invalide",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "404": {
+                        "description": "Échange non trouvé",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/exchanges/{id}/accept": {
+            "put": {
+                "description": "Accepte une demande d'échange en cours. Seul le propriétaire du service peut accepter et cela débite les crédits correspondants au demandeur.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Exchanges"
+                ],
+                "summary": "Accepter une demande d'échange",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "ID de l'échange",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "ID du propriétaire",
+                        "name": "X-User-ID",
+                        "in": "header",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/main.Exchange"
+                        }
+                    },
+                    "400": {
+                        "description": "Requête invalide ou crédits insuffisants",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "403": {
+                        "description": "Accès interdit",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "404": {
+                        "description": "Échange non trouvé",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/exchanges/{id}/cancel": {
+            "put": {
+                "description": "Annule un échange en cours. Le demandeur et le prestataire peuvent tous deux l'annuler. Si l'échange était accepté, le demandeur est remboursé.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Exchanges"
+                ],
+                "summary": "Annuler un échange",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "ID de l'échange",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "ID de l'utilisateur connecté",
+                        "name": "X-User-ID",
+                        "in": "header",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/main.Exchange"
+                        }
+                    },
+                    "400": {
+                        "description": "Statut invalide",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "403": {
+                        "description": "Accès interdit",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "404": {
+                        "description": "Échange non trouvé",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/exchanges/{id}/complete": {
+            "put": {
+                "description": "Termine un échange. Seul le demandeur peut le valider une fois le service rendu, ce qui transfère les crédits au prestataire.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Exchanges"
+                ],
+                "summary": "Marquer un échange comme terminé",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "ID de l'échange",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "ID du demandeur",
+                        "name": "X-User-ID",
+                        "in": "header",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/main.Exchange"
+                        }
+                    },
+                    "400": {
+                        "description": "Statut invalide",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "403": {
+                        "description": "Accès interdit",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "404": {
+                        "description": "Échange non trouvé",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/exchanges/{id}/reject": {
+            "put": {
+                "description": "Refuse une demande d'échange en cours. Seul le propriétaire du service peut la refuser.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Exchanges"
+                ],
+                "summary": "Refuser une demande d'échange",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "ID de l'échange",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "ID du propriétaire",
+                        "name": "X-User-ID",
+                        "in": "header",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/main.Exchange"
+                        }
+                    },
+                    "400": {
+                        "description": "Statut invalide",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "403": {
+                        "description": "Accès interdit",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "404": {
+                        "description": "Échange non trouvé",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/exchanges/{id}/review": {
+            "post": {
+                "description": "Enregistre un avis (note et commentaire) pour un échange terminé. L'auteur doit être le demandeur ou le prestataire de l'échange.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Reviews"
+                ],
+                "summary": "Laisser un avis",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "ID de l'échange",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "ID de l'auteur",
+                        "name": "X-User-ID",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "description": "Détails de l'avis",
+                        "name": "review",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/main.ReviewRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/main.Review"
+                        }
+                    },
+                    "400": {
+                        "description": "Requête invalide ou échange non terminé",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "403": {
+                        "description": "Accès interdit",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "404": {
+                        "description": "Échange non trouvé",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "409": {
+                        "description": "Avis déjà soumis",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/services": {
+            "get": {
+                "description": "Liste les services actifs avec filtres optionnels par catégorie, ville et recherche plein texte.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Services"
+                ],
+                "summary": "Rechercher des services",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Filtrer par catégorie",
+                        "name": "categorie",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Filtrer par ville",
+                        "name": "ville",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Recherche plein texte",
+                        "name": "search",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/main.Service"
+                            }
+                        }
+                    }
+                }
+            },
+            "post": {
+                "description": "Publie une nouvelle annonce de service par le prestataire connecté (requiert la compétence correspondante).",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Services"
+                ],
+                "summary": "Créer une annonce de service",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "ID du prestataire",
+                        "name": "X-User-ID",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "description": "Données du service",
+                        "name": "service",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/main.ServiceRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/main.Service"
+                        }
+                    },
+                    "400": {
+                        "description": "Requête ou compétence invalide",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "403": {
+                        "description": "Accès interdit",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/services/{id}": {
+            "get": {
+                "description": "Récupère les informations d'un service actif par son ID.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Services"
+                ],
+                "summary": "Obtenir le détail d'un service",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "ID du service",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/main.Service"
+                        }
+                    },
+                    "400": {
+                        "description": "ID invalide",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "404": {
+                        "description": "Service non trouvé ou inactif",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            },
+            "put": {
+                "description": "Met à jour le titre, la description, la catégorie, la durée ou les crédits d'un service existant. Le prestataire connecté doit être le propriétaire du service.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Services"
+                ],
+                "summary": "Modifier un service",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "ID du service",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "ID du prestataire",
+                        "name": "X-User-ID",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "description": "Nouvelles données du service",
+                        "name": "service",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/main.ServiceRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/main.Service"
+                        }
+                    },
+                    "400": {
+                        "description": "Requête invalide",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "403": {
+                        "description": "Accès interdit",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "404": {
+                        "description": "Service non trouvé",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "description": "Désactive un service (l'annonce ne sera plus visible ni disponible). Le prestataire connecté doit être le propriétaire du service et il ne doit pas y avoir d'échange actif.",
+                "tags": [
+                    "Services"
+                ],
+                "summary": "Désactiver un service",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "ID du service",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "ID du prestataire",
+                        "name": "X-User-ID",
+                        "in": "header",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "Désactivé avec succès"
+                    },
+                    "400": {
+                        "description": "ID invalide",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "403": {
+                        "description": "Accès interdit",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "404": {
+                        "description": "Service non trouvé",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflit (échange en cours)",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/services/{id}/reviews": {
+            "get": {
+                "description": "Récupère la liste de tous les avis laissés sur un service spécifique par son ID.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Reviews"
+                ],
+                "summary": "Obtenir les avis sur un service",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "ID du service",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/main.Review"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "ID invalide",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/users": {
+            "post": {
+                "description": "Crée un nouveau compte utilisateur et lui attribue 10 crédits par défaut.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Users"
+                ],
+                "summary": "Créer un utilisateur",
+                "parameters": [
+                    {
+                        "description": "Données de l'utilisateur",
+                        "name": "user",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/main.UserRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/main.User"
+                        }
+                    },
+                    "400": {
+                        "description": "Requête invalide",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "409": {
+                        "description": "Pseudo déjà pris",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/users/{id}": {
+            "get": {
+                "description": "Récupère le profil public d'un utilisateur ainsi que la liste de ses compétences.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Users"
+                ],
+                "summary": "Obtenir un utilisateur par ID",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "ID de l'utilisateur",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/main.User"
+                        }
+                    },
+                    "400": {
+                        "description": "ID invalide",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "404": {
+                        "description": "Utilisateur non trouvé",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            },
+            "put": {
+                "description": "Met à jour le pseudo, la bio ou la ville de l'utilisateur. L'utilisateur doit s'authentifier via l'en-tête X-User-ID.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Users"
+                ],
+                "summary": "Mettre à jour son profil",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "ID de l'utilisateur",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "ID de l'utilisateur connecté",
+                        "name": "X-User-ID",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "description": "Données utilisateur à mettre à jour",
+                        "name": "user",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/main.UserRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/main.User"
+                        }
+                    },
+                    "400": {
+                        "description": "Requête invalide",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "403": {
+                        "description": "Accès interdit",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "404": {
+                        "description": "Utilisateur non trouvé",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/users/{id}/reviews": {
+            "get": {
+                "description": "Récupère la liste de tous les avis laissés sur le profil d'un utilisateur par son ID.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Reviews"
+                ],
+                "summary": "Obtenir les avis reçus par un utilisateur",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "ID de l'utilisateur cible",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/main.Review"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "ID invalide",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/users/{id}/skills": {
+            "get": {
+                "description": "Récupère la liste des compétences définies pour un utilisateur par son ID.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Users"
+                ],
+                "summary": "Obtenir les compétences d'un utilisateur",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "ID de l'utilisateur",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/main.Skill"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "ID invalide",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "404": {
+                        "description": "Utilisateur non trouvé",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            },
+            "put": {
+                "description": "Remplace la liste des compétences de l'utilisateur connecté.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Users"
+                ],
+                "summary": "Définir les compétences d'un utilisateur",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "ID de l'utilisateur",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "ID de l'utilisateur connecté",
+                        "name": "X-User-ID",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "description": "Liste des compétences",
+                        "name": "skills",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/main.Skill"
+                            }
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/main.Skill"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Requête ou niveau invalide",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "403": {
+                        "description": "Accès interdit",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "404": {
+                        "description": "Utilisateur non trouvé",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/users/{id}/stats": {
+            "get": {
+                "description": "Récupère des indicateurs clés pour un utilisateur : nombre de services actifs, nombre d'échanges complétés, solde de crédits, note moyenne, nombre d'avis reçus, total des crédits gagnés et dépensés.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Users"
+                ],
+                "summary": "Obtenir les statistiques d'un utilisateur",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "ID de l'utilisateur",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/main.UserStats"
+                        }
+                    },
+                    "400": {
+                        "description": "ID invalide",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "404": {
+                        "description": "Utilisateur non trouvé",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "definitions": {
+        "main.Exchange": {
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "owner_id": {
+                    "type": "integer"
+                },
+                "requester_id": {
+                    "type": "integer"
+                },
+                "service_id": {
+                    "type": "integer"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "string"
+                }
+            }
+        },
+        "main.ExchangeRequest": {
+            "type": "object",
+            "properties": {
+                "owner_id": {
+                    "type": "integer"
+                },
+                "requester_id": {
+                    "type": "integer"
+                },
+                "service_id": {
+                    "type": "integer"
+                }
+            }
+        },
+        "main.Review": {
+            "type": "object",
+            "properties": {
+                "author_id": {
+                    "type": "integer"
+                },
+                "commentaire": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "exchange_id": {
+                    "type": "integer"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "note": {
+                    "type": "integer"
+                },
+                "target_id": {
+                    "type": "integer"
+                }
+            }
+        },
+        "main.ReviewRequest": {
+            "type": "object",
+            "properties": {
+                "commentaire": {
+                    "type": "string"
+                },
+                "note": {
+                    "type": "integer"
+                }
+            }
+        },
+        "main.Service": {
+            "type": "object",
+            "properties": {
+                "actif": {
+                    "type": "boolean"
+                },
+                "categorie": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "credits": {
+                    "type": "integer"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "duree_minutes": {
+                    "type": "integer"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "provider_id": {
+                    "type": "integer"
+                },
+                "titre": {
+                    "type": "string"
+                },
+                "ville": {
+                    "type": "string"
+                }
+            }
+        },
+        "main.ServiceRequest": {
+            "type": "object",
+            "properties": {
+                "categorie": {
+                    "type": "string"
+                },
+                "credits": {
+                    "type": "integer"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "duree_minutes": {
+                    "type": "integer"
+                },
+                "titre": {
+                    "type": "string"
+                },
+                "ville": {
+                    "type": "string"
+                }
+            }
+        },
+        "main.Skill": {
+            "type": "object",
+            "properties": {
+                "niveau": {
+                    "type": "string"
+                },
+                "nom": {
+                    "type": "string"
+                }
+            }
+        },
+        "main.User": {
+            "type": "object",
+            "properties": {
+                "bio": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "credit_balance": {
+                    "type": "integer"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "pseudo": {
+                    "type": "string"
+                },
+                "skills": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/main.Skill"
+                    }
+                },
+                "ville": {
+                    "type": "string"
+                }
+            }
+        },
+        "main.UserRequest": {
+            "type": "object",
+            "properties": {
+                "bio": {
+                    "type": "string"
+                },
+                "pseudo": {
+                    "type": "string"
+                },
+                "ville": {
+                    "type": "string"
+                }
+            }
+        },
+        "main.UserStats": {
+            "type": "object",
+            "properties": {
+                "credit_balance": {
+                    "type": "integer"
+                },
+                "echanges_completes": {
+                    "type": "integer"
+                },
+                "nb_avis": {
+                    "type": "integer"
+                },
+                "note_moyenne": {
+                    "type": "number"
+                },
+                "services_actifs": {
+                    "type": "integer"
+                },
+                "total_depense": {
+                    "type": "integer"
+                },
+                "total_gagne": {
+                    "type": "integer"
+                },
+                "user_id": {
+                    "type": "integer"
+                }
+            }
+        }
+    }
+}
