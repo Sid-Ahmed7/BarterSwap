@@ -23,6 +23,8 @@ const (
 
 	queryDeleteService = `UPDATE services SET actif = false WHERE id = $1`
 
+	queryGetSimilarServices = `SELECT id, provider_id, titre, COALESCE(description,''), categorie, duree_minutes, credits, COALESCE(ville,''), actif, created_at FROM services WHERE categorie = (SELECT categorie FROM services WHERE id = $1) AND ville = (SELECT COALESCE(ville,'') FROM services WHERE id = $1) AND id != $1 AND actif = true ORDER BY created_at DESC LIMIT 3`
+
 	queryHasSkillForCategory = `SELECT COUNT(*) FROM skills WHERE user_id = $1 AND nom = $2`
 
 	queryCreateExchange = `INSERT INTO exchanges (service_id, requester_id, owner_id) VALUES ($1, $2, $3) RETURNING id, service_id, requester_id, owner_id, status, created_at, updated_at`

@@ -103,6 +103,27 @@ func handleListServices(store ServiceStore) http.HandlerFunc {
 	}
 }
 
+func handleGetSimilarServices(store ServiceStore) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		id, err := parseID(r)
+		if err != nil {
+			errBadRequest(w, "invalid service id")
+			return
+		}
+
+		ctx, cancel := newCtx(r)
+		defer cancel()
+
+		services, err := store.GetSimilarServices(ctx, id)
+		if err != nil {
+			errInternal(w)
+			return
+		}
+
+		respondJSON(w, http.StatusOK, services)
+	}
+}
+
 func handleUpdateService(store ServiceStore) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		id, err := parseID(r)

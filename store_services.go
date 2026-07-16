@@ -94,6 +94,30 @@ func (db *DB) ListServices(ctx context.Context, filter ServiceListRequest) ([]Se
 	return services, rows.Err()
 }
 
+func (db *DB) GetSimilarServices(ctx context.Context, id int) ([]Service, error) {
+	rows, err := db.QueryContext(ctx, queryGetSimilarServices, id)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var services []Service
+	for rows.Next() {
+		var s Service
+		if err := rows.Scan(&s.ID, &s.ProviderID, &s.Titre, &s.Description, &s.Categorie, &s.DureeMinutes, &s.Credits, &s.Ville, &s.Actif, &s.CreatedAt); err != nil {
+			return nil, err
+		}
+		services = append(services, s)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	if services == nil {
+		services = []Service{}
+	}
+	return services, nil
+}
+
 func (db *DB) HasSkillsForCategory(ctx context.Context, userID int, categorie string) (bool, error) {
 	var count int
 	err := db.QueryRowContext(ctx, queryHasSkillForCategory, userID, categorie).Scan(&count)

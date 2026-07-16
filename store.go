@@ -19,6 +19,7 @@ type ServiceStore interface {
 	UpdateService(ctx context.Context, id int, r ServiceRequest) (Service, error)
 	DeleteService(ctx context.Context, id int) error
 	ListServices(ctx context.Context, filter ServiceListRequest) ([]Service, error)
+	GetSimilarServices(ctx context.Context, id int) ([]Service, error)
 	HasSkillsForCategory(ctx context.Context, userID int, categorie string) (bool, error)
 }
 

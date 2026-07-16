@@ -42,6 +42,7 @@ func main() {
 	mux.HandleFunc("POST /api/services", handleCreateService(store))
 	mux.HandleFunc("GET /api/services/{id}", handleGetService(store))
 	mux.HandleFunc("GET /api/services", handleListServices(store))
+	mux.HandleFunc("GET /api/services/{id}/similar", handleGetSimilarServices(store))
 	mux.HandleFunc("PUT /api/services/{id}", handleUpdateService(store))
 	mux.HandleFunc("DELETE /api/services/{id}", handleDeleteService(store, store))
 
