@@ -1,6 +1,10 @@
 package main
 
-import "testing"
+import (
+	"context"
+	"errors"
+	"testing"
+)
 
 func TestValidateUser(t *testing.T) {
 	tests := []struct {
@@ -99,3 +103,324 @@ func TestValidateServiceRequest(t *testing.T) {
 		})
 	}
 }
+
+func TestProcessAcceptExchange_CancelContext(t *testing.T) {
+	databaseInstance := setupTestDB(t)
+	cancelledContext, cancelFunc := context.WithCancel(context.Background())
+	cancelFunc()
+
+	_, err := processAcceptExchange(cancelledContext, databaseInstance, 1)
+	if err == nil {
+		t.Error("expected error due to cancelled context, got nil")
+	}
+}
+
+func TestProcessAcceptExchange_NotFound(t *testing.T) {
+	databaseInstance := setupTestDB(t)
+	contextInstance := context.Background()
+
+	_, err := processAcceptExchange(contextInstance, databaseInstance, 999999)
+	if !errors.Is(err, ErrNotFound) {
+		t.Errorf("expected ErrNotFound, got %v", err)
+	}
+}
+
+func TestProcessAcceptExchange_InsufficientCredits(t *testing.T) {
+	databaseInstance := setupTestDB(t)
+	contextInstance := context.Background()
+
+	provider, err := databaseInstance.CreateUser(contextInstance, UserRequest{Pseudo: "Provider"})
+	if err != nil {
+		t.Fatalf("failed to create provider: %v", err)
+	}
+
+	requester, err := databaseInstance.CreateUser(contextInstance, UserRequest{Pseudo: "Requester"})
+	if err != nil {
+		t.Fatalf("failed to create requester: %v", err)
+	}
+
+	_, err = databaseInstance.ExecContext(contextInstance, "UPDATE users SET credit_balance = 0 WHERE id = $1", requester.ID)
+	if err != nil {
+		t.Fatalf("failed to clear requester credit balance: %v", err)
+	}
+
+	service, err := databaseInstance.CreateService(contextInstance, provider.ID, ServiceRequest{
+		Titre:        "Cours de Go",
+		Categorie:    "Informatique",
+		DureeMinutes: 60,
+		Credits:      5,
+	})
+	if err != nil {
+		t.Fatalf("failed to create service: %v", err)
+	}
+
+	exchange, err := databaseInstance.CreateExchange(contextInstance, ExchangeRequest{
+		ServiceID:   service.ID,
+		RequesterID: requester.ID,
+		OwnerID:     provider.ID,
+	})
+	if err != nil {
+		t.Fatalf("failed to create exchange: %v", err)
+	}
+
+	_, err = processAcceptExchange(contextInstance, databaseInstance, exchange.ID)
+	if !errors.Is(err, ErrInsufficientCredits) {
+		t.Errorf("expected ErrInsufficientCredits, got %v", err)
+	}
+}
+
+func TestProcessAcceptExchange_Success(t *testing.T) {
+	databaseInstance := setupTestDB(t)
+	contextInstance := context.Background()
+
+	provider, err := databaseInstance.CreateUser(contextInstance, UserRequest{Pseudo: "Provider"})
+	if err != nil {
+		t.Fatalf("failed to create provider: %v", err)
+	}
+
+	requester, err := databaseInstance.CreateUser(contextInstance, UserRequest{Pseudo: "Requester"})
+	if err != nil {
+		t.Fatalf("failed to create requester: %v", err)
+	}
+
+	service, err := databaseInstance.CreateService(contextInstance, provider.ID, ServiceRequest{
+		Titre:        "Cours de Go",
+		Categorie:    "Informatique",
+		DureeMinutes: 60,
+		Credits:      3,
+	})
+	if err != nil {
+		t.Fatalf("failed to create service: %v", err)
+	}
+
+	exchange, err := databaseInstance.CreateExchange(contextInstance, ExchangeRequest{
+		ServiceID:   service.ID,
+		RequesterID: requester.ID,
+		OwnerID:     provider.ID,
+	})
+	if err != nil {
+		t.Fatalf("failed to create exchange: %v", err)
+	}
+
+	acceptedExchange, err := processAcceptExchange(contextInstance, databaseInstance, exchange.ID)
+	if err != nil {
+		t.Fatalf("expected successful exchange acceptance, got error: %v", err)
+	}
+
+	if acceptedExchange.Status != "accepted" {
+		t.Errorf("expected status to be accepted, got %q", acceptedExchange.Status)
+	}
+
+	updatedRequester, err := databaseInstance.GetUserByID(contextInstance, requester.ID)
+	if err != nil {
+		t.Fatalf("failed to fetch updated requester: %v", err)
+	}
+
+	if updatedRequester.CreditBalance != 7 {
+		t.Errorf("expected credit balance 7, got %d", updatedRequester.CreditBalance)
+	}
+}
+
+func TestProcessCompleteExchange_CancelContext(t *testing.T) {
+	databaseInstance := setupTestDB(t)
+	cancelledContext, cancelFunc := context.WithCancel(context.Background())
+	cancelFunc()
+
+	_, err := processCompleteExchange(cancelledContext, databaseInstance, 1)
+	if err == nil {
+		t.Error("expected error due to cancelled context, got nil")
+	}
+}
+
+func TestProcessCompleteExchange_NotFound(t *testing.T) {
+	databaseInstance := setupTestDB(t)
+	contextInstance := context.Background()
+
+	_, err := processCompleteExchange(contextInstance, databaseInstance, 999999)
+	if !errors.Is(err, ErrNotFound) {
+		t.Errorf("expected ErrNotFound, got %v", err)
+	}
+}
+
+func TestProcessCompleteExchange_Success(t *testing.T) {
+	databaseInstance := setupTestDB(t)
+	contextInstance := context.Background()
+
+	provider, err := databaseInstance.CreateUser(contextInstance, UserRequest{Pseudo: "Provider"})
+	if err != nil {
+		t.Fatalf("failed to create provider: %v", err)
+	}
+
+	requester, err := databaseInstance.CreateUser(contextInstance, UserRequest{Pseudo: "Requester"})
+	if err != nil {
+		t.Fatalf("failed to create requester: %v", err)
+	}
+
+	service, err := databaseInstance.CreateService(contextInstance, provider.ID, ServiceRequest{
+		Titre:        "Cours de Go",
+		Categorie:    "Informatique",
+		DureeMinutes: 60,
+		Credits:      4,
+	})
+	if err != nil {
+		t.Fatalf("failed to create service: %v", err)
+	}
+
+	exchange, err := databaseInstance.CreateExchange(contextInstance, ExchangeRequest{
+		ServiceID:   service.ID,
+		RequesterID: requester.ID,
+		OwnerID:     provider.ID,
+	})
+	if err != nil {
+		t.Fatalf("failed to create exchange: %v", err)
+	}
+
+	completedExchange, err := processCompleteExchange(contextInstance, databaseInstance, exchange.ID)
+	if err != nil {
+		t.Fatalf("expected successful exchange completion, got error: %v", err)
+	}
+
+	if completedExchange.Status != "completed" {
+		t.Errorf("expected status to be completed, got %q", completedExchange.Status)
+	}
+
+	updatedProvider, err := databaseInstance.GetUserByID(contextInstance, provider.ID)
+	if err != nil {
+		t.Fatalf("failed to fetch updated provider: %v", err)
+	}
+
+	if updatedProvider.CreditBalance != 14 {
+		t.Errorf("expected credit balance 14, got %d", updatedProvider.CreditBalance)
+	}
+}
+
+func TestProcessCancelExchange_CancelContext(t *testing.T) {
+	databaseInstance := setupTestDB(t)
+	cancelledContext, cancelFunc := context.WithCancel(context.Background())
+	cancelFunc()
+
+	_, err := processCancelExchange(cancelledContext, databaseInstance, 1)
+	if err == nil {
+		t.Error("expected error due to cancelled context, got nil")
+	}
+}
+
+func TestProcessCancelExchange_NotFound(t *testing.T) {
+	databaseInstance := setupTestDB(t)
+	contextInstance := context.Background()
+
+	_, err := processCancelExchange(contextInstance, databaseInstance, 999999)
+	if !errors.Is(err, ErrNotFound) {
+		t.Errorf("expected ErrNotFound, got %v", err)
+	}
+}
+
+func TestProcessCancelExchange_PendingStatus(t *testing.T) {
+	databaseInstance := setupTestDB(t)
+	contextInstance := context.Background()
+
+	provider, err := databaseInstance.CreateUser(contextInstance, UserRequest{Pseudo: "Provider"})
+	if err != nil {
+		t.Fatalf("failed to create provider: %v", err)
+	}
+
+	requester, err := databaseInstance.CreateUser(contextInstance, UserRequest{Pseudo: "Requester"})
+	if err != nil {
+		t.Fatalf("failed to create requester: %v", err)
+	}
+
+	service, err := databaseInstance.CreateService(contextInstance, provider.ID, ServiceRequest{
+		Titre:        "Cours de Go",
+		Categorie:    "Informatique",
+		DureeMinutes: 60,
+		Credits:      5,
+	})
+	if err != nil {
+		t.Fatalf("failed to create service: %v", err)
+	}
+
+	exchange, err := databaseInstance.CreateExchange(contextInstance, ExchangeRequest{
+		ServiceID:   service.ID,
+		RequesterID: requester.ID,
+		OwnerID:     provider.ID,
+	})
+	if err != nil {
+		t.Fatalf("failed to create exchange: %v", err)
+	}
+
+	cancelledExchange, err := processCancelExchange(contextInstance, databaseInstance, exchange.ID)
+	if err != nil {
+		t.Fatalf("expected successful exchange cancellation, got error: %v", err)
+	}
+
+	if cancelledExchange.Status != "cancelled" {
+		t.Errorf("expected status to be cancelled, got %q", cancelledExchange.Status)
+	}
+
+	updatedRequester, err := databaseInstance.GetUserByID(contextInstance, requester.ID)
+	if err != nil {
+		t.Fatalf("failed to fetch updated requester: %v", err)
+	}
+
+	if updatedRequester.CreditBalance != 10 {
+		t.Errorf("expected credit balance 10, got %d", updatedRequester.CreditBalance)
+	}
+}
+
+func TestProcessCancelExchange_AcceptedStatus(t *testing.T) {
+	databaseInstance := setupTestDB(t)
+	contextInstance := context.Background()
+
+	provider, err := databaseInstance.CreateUser(contextInstance, UserRequest{Pseudo: "Provider"})
+	if err != nil {
+		t.Fatalf("failed to create provider: %v", err)
+	}
+
+	requester, err := databaseInstance.CreateUser(contextInstance, UserRequest{Pseudo: "Requester"})
+	if err != nil {
+		t.Fatalf("failed to create requester: %v", err)
+	}
+
+	service, err := databaseInstance.CreateService(contextInstance, provider.ID, ServiceRequest{
+		Titre:        "Cours de Go",
+		Categorie:    "Informatique",
+		DureeMinutes: 60,
+		Credits:      5,
+	})
+	if err != nil {
+		t.Fatalf("failed to create service: %v", err)
+	}
+
+	exchange, err := databaseInstance.CreateExchange(contextInstance, ExchangeRequest{
+		ServiceID:   service.ID,
+		RequesterID: requester.ID,
+		OwnerID:     provider.ID,
+	})
+	if err != nil {
+		t.Fatalf("failed to create exchange: %v", err)
+	}
+
+	_, err = processAcceptExchange(contextInstance, databaseInstance, exchange.ID)
+	if err != nil {
+		t.Fatalf("failed to accept exchange: %v", err)
+	}
+
+	cancelledExchange, err := processCancelExchange(contextInstance, databaseInstance, exchange.ID)
+	if err != nil {
+		t.Fatalf("expected successful exchange cancellation, got error: %v", err)
+	}
+
+	if cancelledExchange.Status != "cancelled" {
+		t.Errorf("expected status to be cancelled, got %q", cancelledExchange.Status)
+	}
+
+	updatedRequester, err := databaseInstance.GetUserByID(contextInstance, requester.ID)
+	if err != nil {
+		t.Fatalf("failed to fetch updated requester: %v", err)
+	}
+
+	if updatedRequester.CreditBalance != 10 {
+		t.Errorf("expected credit balance 10 (refunded), got %d", updatedRequester.CreditBalance)
+	}
+}
+
