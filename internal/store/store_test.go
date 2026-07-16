@@ -1,17 +1,42 @@
-package main
+package store
 
 import (
 	"context"
+	"database/sql"
 	"errors"
+	"os"
 	"testing"
+
+	apperrs "barterswap/internal/errors"
+	"barterswap/internal/model"
+
+	_ "github.com/lib/pq"
 )
+
+func setupTestDB(t *testing.T) *DB {
+	t.Helper()
+	dsn := os.Getenv("TEST_DATABASE_URL")
+	if dsn == "" {
+		t.Skip("TEST_DATABASE_URL not set, skipping integration tests")
+	}
+	sqlDB, err := sql.Open("postgres", dsn)
+	if err != nil {
+		t.Fatalf("sql.Open: %v", err)
+	}
+	if err := sqlDB.Ping(); err != nil {
+		t.Skipf("cannot connect to test DB: %v", err)
+	}
+	t.Cleanup(func() { sqlDB.Close() })
+	sqlDB.Exec("TRUNCATE users RESTART IDENTITY CASCADE")
+	return &DB{sqlDB}
+}
 
 func TestStore_ReplaceSkills_InsertError(t *testing.T) {
 	databaseInstance := setupTestDB(t)
 	contextInstance := context.Background()
 
 	invalidUserID := 999999
-	skills := []Skill{
+	skills := []model.Skill{
 		{Nom: "Go", Niveau: "expert"},
 	}
 
@@ -26,7 +51,7 @@ func TestStore_ReplaceSkills_CancelContext(t *testing.T) {
 	cancelledContext, cancelFunc := context.WithCancel(context.Background())
 	cancelFunc()
 
-	skills := []Skill{
+	skills := []model.Skill{
 		{Nom: "Go", Niveau: "expert"},
 	}
 
@@ -54,7 +79,7 @@ func TestStore_DeleteService_NotFound(t *testing.T) {
 	nonExistentServiceID := 999999
 
 	err := databaseInstance.DeleteService(contextInstance, nonExistentServiceID)
-	if !errors.Is(err, ErrNotFound) {
+	if !errors.Is(err, apperrs.ErrNotFound) {
 		t.Errorf("expected ErrNotFound, got %v", err)
 	}
 }
@@ -75,7 +100,7 @@ func TestStore_ListServices_CancelContext(t *testing.T) {
 	cancelledContext, cancelFunc := context.WithCancel(context.Background())
 	cancelFunc()
 
-	filter := ServiceListRequest{}
+	filter := model.ServiceListRequest{}
 	_, err := databaseInstance.ListServices(cancelledContext, filter)
 	if err == nil {
 		t.Error("expected error due to cancelled context, got nil")
@@ -94,7 +119,7 @@ func TestStore_GetExchange_NotFound(t *testing.T) {
 
 	nonExistentExchangeID := 999999
 	_, err = getExchange(contextInstance, transaction, nonExistentExchangeID)
-	if !errors.Is(err, ErrNotFound) {
+	if !errors.Is(err, apperrs.ErrNotFound) {
 		t.Errorf("expected ErrNotFound, got %v", err)
 	}
 }

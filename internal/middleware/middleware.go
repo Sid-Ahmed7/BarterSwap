@@ -1,9 +1,11 @@
-package main
+package middleware
 
 import (
 	"log"
 	"net/http"
 	"time"
+
+	apperrs "barterswap/internal/errors"
 )
 
 type responseWriter struct {
@@ -30,7 +32,7 @@ func middlewareRecovery(next http.Handler) http.Handler {
 		defer func() {
 			if err := recover(); err != nil {
 				log.Printf("panic: %v", err)
-				errInternal(w)
+				apperrs.RespondInternal(w)
 			}
 		}()
 		next.ServeHTTP(w, r)
@@ -50,6 +52,6 @@ func middlewareCORS(next http.Handler) http.Handler {
 	})
 }
 
-func buildHandler(h http.Handler) http.Handler {
+func BuildHandler(h http.Handler) http.Handler {
 	return middlewareCORS(middlewareLogging(middlewareRecovery(h)))
 }

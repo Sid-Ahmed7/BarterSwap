@@ -11,4 +11,4 @@ COPY --chown=go:go . .
 
 USER go
 
-CMD ["go", "run", "."]
+CMD ["go", "run", "./cmd"]

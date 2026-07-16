@@ -11,4 +11,4 @@ COPY --chown=go:go . .
 
 USER go
 
-CMD ["go", "test", "-v", "-cover", "-count=1", "./..."]
+CMD ["go", "test", "-v", "-cover", "-count=1", "-p", "1", "./..."]

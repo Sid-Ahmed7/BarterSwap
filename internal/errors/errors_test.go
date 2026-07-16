@@ -1,4 +1,4 @@
-package main
+package apperrs
 
 import (
 	"database/sql"
@@ -46,7 +46,7 @@ func TestIsUniqueViolation(t *testing.T) {
 func TestErrorResponseHelpers(t *testing.T) {
 	t.Run("errNotFound", func(t *testing.T) {
 		recorder := httptest.NewRecorder()
-		errNotFound(recorder)
+		RespondNotFound(recorder)
 
 		if recorder.Code != http.StatusNotFound {
 			t.Errorf("expected 404, got %d", recorder.Code)
@@ -58,7 +58,7 @@ func TestErrorResponseHelpers(t *testing.T) {
 
 	t.Run("errForbidden", func(t *testing.T) {
 		recorder := httptest.NewRecorder()
-		errForbidden(recorder)
+		RespondForbidden(recorder)
 
 		if recorder.Code != http.StatusForbidden {
 			t.Errorf("expected 403, got %d", recorder.Code)
@@ -70,7 +70,7 @@ func TestErrorResponseHelpers(t *testing.T) {
 
 	t.Run("errInternal", func(t *testing.T) {
 		recorder := httptest.NewRecorder()
-		errInternal(recorder)
+		RespondInternal(recorder)
 
 		if recorder.Code != http.StatusInternalServerError {
 			t.Errorf("expected 500, got %d", recorder.Code)
@@ -82,7 +82,7 @@ func TestErrorResponseHelpers(t *testing.T) {
 
 	t.Run("errBadRequest", func(t *testing.T) {
 		recorder := httptest.NewRecorder()
-		errBadRequest(recorder, "invalid payload")
+		RespondBadRequest(recorder, "invalid payload")
 
 		if recorder.Code != http.StatusBadRequest {
 			t.Errorf("expected 400, got %d", recorder.Code)
@@ -94,7 +94,7 @@ func TestErrorResponseHelpers(t *testing.T) {
 
 	t.Run("errConflict", func(t *testing.T) {
 		recorder := httptest.NewRecorder()
-		errConflict(recorder, "resource exists")
+		RespondConflict(recorder, "resource exists")
 
 		if recorder.Code != http.StatusConflict {
 			t.Errorf("expected 409, got %d", recorder.Code)
@@ -109,7 +109,7 @@ func TestRespondError(t *testing.T) {
 	t.Run("validation error", func(t *testing.T) {
 		recorder := httptest.NewRecorder()
 		valErr := ValidationError{Field: "email", Message: "invalid email"}
-		respondError(recorder, valErr)
+		RespondError(recorder, valErr)
 
 		if recorder.Code != http.StatusBadRequest {
 			t.Errorf("expected 400, got %d", recorder.Code)
@@ -122,7 +122,7 @@ func TestRespondError(t *testing.T) {
 	t.Run("generic error", func(t *testing.T) {
 		recorder := httptest.NewRecorder()
 		err := errors.New("custom business error")
-		respondError(recorder, err)
+		RespondError(recorder, err)
 
 		if recorder.Code != http.StatusBadRequest {
 			t.Errorf("expected 400, got %d", recorder.Code)
@@ -135,7 +135,7 @@ func TestRespondError(t *testing.T) {
 
 func TestMapErrNotFound(t *testing.T) {
 	t.Run("sql err no rows", func(t *testing.T) {
-		err := mapErrNotFound(sql.ErrNoRows)
+		err := MapErrNotFound(sql.ErrNoRows)
 		if !errors.Is(err, ErrNotFound) {
 			t.Errorf("expected ErrNotFound, got %v", err)
 		}
@@ -143,7 +143,7 @@ func TestMapErrNotFound(t *testing.T) {
 
 	t.Run("other error", func(t *testing.T) {
 		otherErr := errors.New("database connection issue")
-		err := mapErrNotFound(otherErr)
+		err := MapErrNotFound(otherErr)
 		if err != otherErr {
 			t.Errorf("expected original error, got %v", err)
 		}
@@ -154,7 +154,7 @@ func TestErrUsernameTaken(t *testing.T) {
 	t.Run("unique violation error", func(t *testing.T) {
 		recorder := httptest.NewRecorder()
 		err := &pq.Error{Code: "23505"}
-		errUsernameTaken(recorder, err)
+		RespondUsernameTaken(recorder, err)
 
 		if recorder.Code != http.StatusConflict {
 			t.Errorf("expected 409, got %d", recorder.Code)
@@ -167,7 +167,7 @@ func TestErrUsernameTaken(t *testing.T) {
 	t.Run("other database error", func(t *testing.T) {
 		recorder := httptest.NewRecorder()
 		err := errors.New("connection reset by peer")
-		errUsernameTaken(recorder, err)
+		RespondUsernameTaken(recorder, err)
 
 		if recorder.Code != http.StatusInternalServerError {
 			t.Errorf("expected 500, got %d", recorder.Code)

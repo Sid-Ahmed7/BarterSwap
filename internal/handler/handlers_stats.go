@@ -1,25 +1,28 @@
-package main
+package handler
 
 import (
+	"encoding/json"
 	"errors"
 	"net/http"
+
+	apperrs "barterswap/internal/errors"
+	"barterswap/internal/store"
 )
 
-// handleGetUserStats godoc
+// HandleGetUserStats godoc
 // @Summary Obtenir les statistiques d'un utilisateur
-// @Description Récupère des indicateurs clés pour un utilisateur : nombre de services actifs, nombre d'échanges complétés, solde de crédits, note moyenne, nombre d'avis reçus, total des crédits gagnés et dépensés.
 // @Tags Users
 // @Produce json
 // @Param id path int true "ID de l'utilisateur"
-// @Success 200 {object} UserStats
+// @Success 200 {object} model.UserStats
 // @Failure 400 {string} string "ID invalide"
 // @Failure 404 {string} string "Utilisateur non trouvé"
 // @Router /api/users/{id}/stats [get]
-func handleGetUserStats(statsStore StatsStore) http.HandlerFunc {
+func HandleGetUserStats(statsStore store.StatsStore) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		id, err := parseID(r)
 		if err != nil {
-			errBadRequest(w, "Invalid id")
+			apperrs.RespondBadRequest(w, "Invalid id")
 			return
 		}
 
@@ -27,15 +30,17 @@ func handleGetUserStats(statsStore StatsStore) http.HandlerFunc {
 		defer cancel()
 
 		stats, err := statsStore.GetUserStats(ctx, id)
-		if errors.Is(err, ErrNotFound) {
-			errNotFound(w)
+		if errors.Is(err, apperrs.ErrNotFound) {
+			apperrs.RespondNotFound(w)
 			return
 		}
 		if err != nil {
-			errInternal(w)
+			apperrs.RespondInternal(w)
 			return
 		}
 
-		respondJSON(w, http.StatusOK, stats)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(stats)
 	}
 }
