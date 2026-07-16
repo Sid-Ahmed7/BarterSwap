@@ -21,7 +21,7 @@ import (
 // @Success 201 {object} model.Service
 // @Failure 400 {string} string "Requête ou compétence invalide"
 // @Router /api/services [post]
-func HandleCreateService(storeService store.ServiceStore) http.HandlerFunc {
+func HandleCreateService(serviceStore store.ServiceStore) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		userID, err := parseUserID(r)
 		if err != nil {
@@ -43,10 +43,10 @@ func HandleCreateService(storeService store.ServiceStore) http.HandlerFunc {
 		ctx, cancel := newCtx(r)
 		defer cancel()
 
-		if !checkSkillsForCategory(w, storeService, ctx, userID, body.Categorie) {
+		if !checkSkillsForCategory(w, serviceStore, ctx, userID, body.Categorie) {
 			return
 		}
-		service, err := storeService.CreateService(ctx, userID, body)
+		service, err := serviceStore.CreateService(ctx, userID, body)
 		if err != nil {
 			apperrs.RespondInternal(w)
 			return
@@ -106,13 +106,13 @@ func HandleGetService(s store.ServiceStore) http.HandlerFunc {
 // @Param search query string false "Recherche plein texte"
 // @Success 200 {array} model.Service
 // @Router /api/services [get]
-func HandleListServices(storeService store.ServiceStore) http.HandlerFunc {
+func HandleListServices(serviceStore store.ServiceStore) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		query := r.URL.Query()
 		ctx, cancel := newCtx(r)
 		defer cancel()
 
-		services, err := storeService.ListServices(ctx, model.ServiceListRequest{
+		services, err := serviceStore.ListServices(ctx, model.ServiceListRequest{
 			Categorie: query.Get("categorie"),
 			Ville:     query.Get("ville"),
 			Search:    query.Get("search"),
@@ -143,7 +143,7 @@ func HandleListServices(storeService store.ServiceStore) http.HandlerFunc {
 // @Failure 403 {string} string "Accès interdit"
 // @Failure 404 {string} string "Service non trouvé"
 // @Router /api/services/{id} [put]
-func HandleUpdateService(s store.ServiceStore) http.HandlerFunc {
+func HandleUpdateService(serviceStore store.ServiceStore) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		id, err := parseID(r)
 		if err != nil {
@@ -156,21 +156,12 @@ func HandleUpdateService(s store.ServiceStore) http.HandlerFunc {
 			return
 		}
 
-		var body model.ServiceRequest
-		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-			apperrs.RespondBadRequest(w, "Invalid body")
-			return
-		}
-
-		if err := service.ValidateServiceRequest(body); err != nil {
-			apperrs.RespondBadRequest(w, err.Error())
-			return
-		}
+		validate := service.ValidateServiceRequest
 
 		ctx, cancel := newCtx(r)
 		defer cancel()
 
-		service, err := s.GetServiceByID(ctx, id)
+		service, err := serviceStore.GetServiceByID(ctx, id)
 		if errors.Is(err, apperrs.ErrNotFound) {
 			apperrs.RespondNotFound(w)
 			return
@@ -185,11 +176,22 @@ func HandleUpdateService(s store.ServiceStore) http.HandlerFunc {
 			return
 		}
 
-		if !checkSkillsForCategory(w, s, ctx, userID, body.Categorie) {
+		var body model.ServiceRequest
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			apperrs.RespondBadRequest(w, "Invalid body")
 			return
 		}
 
-		updated, err := s.UpdateService(ctx, id, body)
+		if err := validate(body); err != nil {
+			apperrs.RespondBadRequest(w, err.Error())
+			return
+		}
+
+		if !checkSkillsForCategory(w, serviceStore, ctx, userID, body.Categorie) {
+			return
+		}
+
+		updated, err := serviceStore.UpdateService(ctx, id, body)
 		if err != nil {
 			apperrs.RespondInternal(w)
 			return
@@ -212,7 +214,7 @@ func HandleUpdateService(s store.ServiceStore) http.HandlerFunc {
 // @Failure 404 {string} string "Service non trouvé"
 // @Failure 409 {string} string "Conflit (échange en cours)"
 // @Router /api/services/{id} [delete]
-func HandleDeleteService(s store.ServiceStore, exchangeStore store.ExchangeStore) http.HandlerFunc {
+func HandleDeleteService(serviceStore store.ServiceStore, exchangeStore store.ExchangeStore) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		id, err := parseID(r)
 		if err != nil {
@@ -228,7 +230,7 @@ func HandleDeleteService(s store.ServiceStore, exchangeStore store.ExchangeStore
 		ctx, cancel := newCtx(r)
 		defer cancel()
 
-		service, err := s.GetServiceByID(ctx, id)
+		service, err := serviceStore.GetServiceByID(ctx, id)
 		if errors.Is(err, apperrs.ErrNotFound) {
 			apperrs.RespondNotFound(w)
 			return
@@ -252,7 +254,7 @@ func HandleDeleteService(s store.ServiceStore, exchangeStore store.ExchangeStore
 			return
 		}
 
-		if err := s.DeleteService(ctx, id); err != nil {
+		if err := serviceStore.DeleteService(ctx, id); err != nil {
 			apperrs.RespondInternal(w)
 			return
 		}

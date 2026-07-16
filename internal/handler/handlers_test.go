@@ -255,7 +255,7 @@ func TestHandleSetUserSkills_Success(t *testing.T) {
 	json.NewDecoder(rr.Body).Decode(&created)
 	id := fmt.Sprint(created.ID)
 
-	skills := []Skill{{Nom: "Go", Niveau: "expert"}, {Nom: "SQL", Niveau: "intermÃ©diaire"}}
+	skills := []Skill{{Nom: "Go", Niveau: "expert"}, {Nom: "SQL", Niveau: "intermédiaire"}}
 	body, _ = json.Marshal(skills)
 	req = httptest.NewRequest(http.MethodPut, "/api/users/"+id+"/skills", bytes.NewReader(body))
 	req.SetPathValue("id", id)
@@ -386,7 +386,7 @@ func TestHandleGetService_NotFound(t *testing.T) {
 func TestHandleGetService_Success(t *testing.T) {
 	db := setupTestDB(t)
 	u := createTestUser(t, db, "svc-carol")
-	setSkills(t, db, u.ID, []Skill{{Nom: "Cuisine", Niveau: "intermÃ©diaire"}})
+	setSkills(t, db, u.ID, []Skill{{Nom: "Cuisine", Niveau: "intermédiaire"}})
 
 	createBody, _ := json.Marshal(ServiceRequest{Titre: "Cours cuisine", Categorie: "Cuisine", DureeMinutes: 90, Credits: 3})
 	req := httptest.NewRequest(http.MethodPost, "/api/services", bytes.NewReader(createBody))
@@ -448,7 +448,7 @@ func TestHandleUpdateService_Forbidden(t *testing.T) {
 	db := setupTestDB(t)
 	u := createTestUser(t, db, "svc-dave")
 	other := createTestUser(t, db, "svc-eve")
-	setSkills(t, db, u.ID, []Skill{{Nom: "Jardinage", Niveau: "dÃ©butant"}})
+	setSkills(t, db, u.ID, []Skill{{Nom: "Jardinage", Niveau: "débutant"}})
 
 	createBody, _ := json.Marshal(ServiceRequest{Titre: "Mon jardin", Categorie: "Jardinage", DureeMinutes: 90, Credits: 2})
 	req := httptest.NewRequest(http.MethodPost, "/api/services", bytes.NewReader(createBody))
@@ -567,7 +567,7 @@ func TestHandleDeleteService_ActiveExchange(t *testing.T) {
 func TestHandleDeleteService_Success(t *testing.T) {
 	db := setupTestDB(t)
 	u := createTestUser(t, db, "svc-ivan")
-	setSkills(t, db, u.ID, []Skill{{Nom: "Cuisine", Niveau: "intermÃ©diaire"}})
+	setSkills(t, db, u.ID, []Skill{{Nom: "Cuisine", Niveau: "intermédiaire"}})
 
 	createBody, _ := json.Marshal(ServiceRequest{Titre: "Cours cuisine", Categorie: "Cuisine", DureeMinutes: 120, Credits: 4})
 	req := httptest.NewRequest(http.MethodPost, "/api/services", bytes.NewReader(createBody))
@@ -608,7 +608,7 @@ func TestHandleListServices_FilterByCategory(t *testing.T) {
 	u := createTestUser(t, db, "svc-judy")
 	setSkills(t, db, u.ID, []Skill{
 		{Nom: "Sport", Niveau: "expert"},
-		{Nom: "Cuisine", Niveau: "dÃ©butant"},
+		{Nom: "Cuisine", Niveau: "débutant"},
 	})
 
 	for _, cat := range []string{"Sport", "Sport", "Cuisine"} {
@@ -663,7 +663,7 @@ func TestHandleListServices_Search(t *testing.T) {
 	u := createTestUser(t, db, "svc-lena")
 	setSkills(t, db, u.ID, []Skill{{Nom: "Musique", Niveau: "expert"}})
 
-	for _, titre := range []string{"Guitare classique", "Guitare Ã©lectrique", "Piano dÃ©butant"} {
+	for _, titre := range []string{"Guitare classique", "Guitare Ã©lectrique", "Piano débutant"} {
 		body, _ := json.Marshal(ServiceRequest{Titre: titre, Categorie: "Musique", DureeMinutes: 60, Credits: 2})
 		req := httptest.NewRequest(http.MethodPost, "/api/services", bytes.NewReader(body))
 		req.Header.Set("X-User-ID", fmt.Sprint(u.ID))
@@ -1052,7 +1052,7 @@ func TestHandleCancelExchange_Forbidden(t *testing.T) {
 	owner := createTestUser(t, db, "cancel-owner")
 	requester := createTestUser(t, db, "cancel-requester")
 	third := createTestUser(t, db, "cancel-third")
-	svc := createTestService(t, db, owner.ID, "DÃ©mÃ©nagement")
+	svc := createTestService(t, db, owner.ID, "Déménagement")
 	exchange := createTestExchange(t, db, requester.ID, svc.ID)
 	acceptTestExchange(t, db, exchange.ID, owner.ID)
 

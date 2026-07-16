@@ -90,8 +90,8 @@ func TestValidateSkills(t *testing.T) {
 		{"empty list", []Skill{}, false},
 		{"valid skill", []Skill{{Nom: "Go", Niveau: "expert"}}, false},
 		{"all valid levels", []Skill{
-			{Nom: "Go", Niveau: "dÃ©butant"},
-			{Nom: "SQL", Niveau: "intermÃ©diaire"},
+			{Nom: "Go", Niveau: "débutant"},
+			{Nom: "SQL", Niveau: "intermédiaire"},
 			{Nom: "Docker", Niveau: "expert"},
 		}, false},
 		{"empty name", []Skill{{Nom: "", Niveau: "expert"}}, true},
@@ -99,7 +99,7 @@ func TestValidateSkills(t *testing.T) {
 		{"empty level", []Skill{{Nom: "Go", Niveau: ""}}, true},
 		{"one invalid among several", []Skill{
 			{Nom: "Go", Niveau: "expert"},
-			{Nom: "", Niveau: "dÃ©butant"},
+			{Nom: "", Niveau: "débutant"},
 		}, true},
 	}
 	for _, tt := range tests {
@@ -327,6 +327,11 @@ func TestProcessCompleteExchange_Success(t *testing.T) {
 	})
 	if err != nil {
 		t.Fatalf("failed to create exchange: %v", err)
+	}
+
+	_, err = processAcceptExchange(contextInstance, databaseInstance, exchange.ID)
+	if err != nil {
+		t.Fatalf("failed to accept exchange: %v", err)
 	}
 
 	completedExchange, err := processCompleteExchange(contextInstance, databaseInstance, exchange.ID)

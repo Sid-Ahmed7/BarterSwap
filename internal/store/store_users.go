@@ -13,21 +13,21 @@ func scanUser(row *sql.Row, u *model.User) error {
 }
 
 func (d *DB) CreateUser(ctx context.Context, r model.UserRequest) (model.User, error) {
-	var u model.User
-	err := scanUser(d.QueryRowContext(ctx, queryCreateUser, r.Pseudo, r.Bio, r.Ville), &u)
-	return u, err
+	var user model.User
+	err := scanUser(d.QueryRowContext(ctx, queryCreateUser, r.Pseudo, r.Bio, r.Ville), &user)
+	return user, err
 }
 
 func (d *DB) GetUserByID(ctx context.Context, id int) (model.User, error) {
-	var u model.User
-	err := scanUser(d.QueryRowContext(ctx, queryGetUserByID, id), &u)
-	return u, apperrs.MapErrNotFound(err)
+	var user model.User
+	err := scanUser(d.QueryRowContext(ctx, queryGetUserByID, id), &user)
+	return user, apperrs.MapErrNotFound(err)
 }
 
 func (d *DB) UpdateUser(ctx context.Context, id int, r model.UserRequest) (model.User, error) {
-	var u model.User
-	err := scanUser(d.QueryRowContext(ctx, queryUpdateUser, r.Pseudo, r.Bio, r.Ville, id), &u)
-	return u, apperrs.MapErrNotFound(err)
+	var user model.User
+	err := scanUser(d.QueryRowContext(ctx, queryUpdateUser, r.Pseudo, r.Bio, r.Ville, id), &user)
+	return user, apperrs.MapErrNotFound(err)
 }
 
 func (d *DB) GetSkillsByUserID(ctx context.Context, userID int) ([]model.Skill, error) {
@@ -39,11 +39,11 @@ func (d *DB) GetSkillsByUserID(ctx context.Context, userID int) ([]model.Skill, 
 
 	var skills []model.Skill
 	for rows.Next() {
-		var s model.Skill
-		if err := rows.Scan(&s.Nom, &s.Niveau); err != nil {
+		var skill model.Skill
+		if err := rows.Scan(&skill.Nom, &skill.Niveau); err != nil {
 			return nil, err
 		}
-		skills = append(skills, s)
+		skills = append(skills, skill)
 	}
 	return skills, rows.Err()
 }
@@ -59,8 +59,8 @@ func (d *DB) ReplaceSkills(ctx context.Context, userID int, skills []model.Skill
 		return err
 	}
 
-	for _, s := range skills {
-		if _, err := tx.ExecContext(ctx, queryInsertSkill, userID, s.Nom, s.Niveau); err != nil {
+	for _, skill := range skills {
+		if _, err := tx.ExecContext(ctx, queryInsertSkill, userID, skill.Nom, skill.Niveau); err != nil {
 			return err
 		}
 	}

@@ -14,21 +14,21 @@ func scanService(row *sql.Row, s *model.Service) error {
 }
 
 func (db *DB) CreateService(ctx context.Context, providerID int, r model.ServiceRequest) (model.Service, error) {
-	var s model.Service
-	err := scanService(db.QueryRowContext(ctx, queryCreateService, providerID, r.Titre, r.Description, r.Categorie, r.DureeMinutes, r.Credits, r.Ville), &s)
-	return s, err
+	var service model.Service
+	err := scanService(db.QueryRowContext(ctx, queryCreateService, providerID, r.Titre, r.Description, r.Categorie, r.DureeMinutes, r.Credits, r.Ville), &service)
+	return service, err
 }
 
 func (db *DB) GetServiceByID(ctx context.Context, id int) (model.Service, error) {
-	var s model.Service
-	err := scanService(db.QueryRowContext(ctx, queryGetServiceByID, id), &s)
-	return s, apperrs.MapErrNotFound(err)
+	var service model.Service
+	err := scanService(db.QueryRowContext(ctx, queryGetServiceByID, id), &service)
+	return service, apperrs.MapErrNotFound(err)
 }
 
 func (db *DB) UpdateService(ctx context.Context, id int, r model.ServiceRequest) (model.Service, error) {
-	var s model.Service
-	err := scanService(db.QueryRowContext(ctx, queryUpdateService, id, r.Titre, r.Description, r.Categorie, r.DureeMinutes, r.Credits, r.Ville), &s)
-	return s, apperrs.MapErrNotFound(err)
+	var service model.Service
+	err := scanService(db.QueryRowContext(ctx, queryUpdateService, id, r.Titre, r.Description, r.Categorie, r.DureeMinutes, r.Credits, r.Ville), &service)
+	return service, apperrs.MapErrNotFound(err)
 }
 
 func (db *DB) DeleteService(ctx context.Context, id int) error {
@@ -77,12 +77,12 @@ func (db *DB) ListServices(ctx context.Context, filter model.ServiceListRequest)
 
 	var services []model.Service
 	for rows.Next() {
-		var s model.Service
-		err := rows.Scan(&s.ID, &s.ProviderID, &s.Titre, &s.Description, &s.Categorie, &s.DureeMinutes, &s.Credits, &s.Ville, &s.Actif, &s.CreatedAt)
+		var service model.Service
+		err := rows.Scan(&service.ID, &service.ProviderID, &service.Titre, &service.Description, &service.Categorie, &service.DureeMinutes, &service.Credits, &service.Ville, &service.Actif, &service.CreatedAt)
 		if err != nil {
 			return nil, err
 		}
-		services = append(services, s)
+		services = append(services, service)
 	}
 
 	return services, rows.Err()

@@ -8,14 +8,14 @@ import (
 	"barterswap/internal/model"
 )
 
-func scanExchange(row *sql.Row, e *model.Exchange) error {
-	return row.Scan(&e.ID, &e.ServiceID, &e.RequesterID, &e.OwnerID, &e.Status, &e.CreatedAt, &e.UpdatedAt)
+func scanExchange(row *sql.Row, exchange *model.Exchange) error {
+	return row.Scan(&exchange.ID, &exchange.ServiceID, &exchange.RequesterID, &exchange.OwnerID, &exchange.Status, &exchange.CreatedAt, &exchange.UpdatedAt)
 }
 
 func (db *DB) CreateExchange(ctx context.Context, req model.ExchangeRequest) (model.Exchange, error) {
-	var e model.Exchange
-	err := scanExchange(db.QueryRowContext(ctx, queryCreateExchange, req.ServiceID, req.RequesterID, req.OwnerID), &e)
-	return e, err
+	var exchange model.Exchange
+	err := scanExchange(db.QueryRowContext(ctx, queryCreateExchange, req.ServiceID, req.RequesterID, req.OwnerID), &exchange)
+	return exchange, err
 }
 
 func (db *DB) ListExchanges(ctx context.Context, userID int, status string) ([]model.Exchange, error) {
@@ -35,19 +35,19 @@ func (db *DB) ListExchanges(ctx context.Context, userID int, status string) ([]m
 
 	var exchanges []model.Exchange
 	for rows.Next() {
-		var e model.Exchange
-		if err := rows.Scan(&e.ID, &e.ServiceID, &e.RequesterID, &e.OwnerID, &e.Status, &e.CreatedAt, &e.UpdatedAt); err != nil {
+		var exchange model.Exchange
+		if err := rows.Scan(&exchange.ID, &exchange.ServiceID, &exchange.RequesterID, &exchange.OwnerID, &exchange.Status, &exchange.CreatedAt, &exchange.UpdatedAt); err != nil {
 			return nil, err
 		}
-		exchanges = append(exchanges, e)
+		exchanges = append(exchanges, exchange)
 	}
 	return exchanges, rows.Err()
 }
 
 func (db *DB) GetExchangeByID(ctx context.Context, id int) (model.Exchange, error) {
-	var e model.Exchange
-	err := scanExchange(db.QueryRowContext(ctx, queryGetExchangeByID, id), &e)
-	return e, apperrs.MapErrNotFound(err)
+	var exchange model.Exchange
+	err := scanExchange(db.QueryRowContext(ctx, queryGetExchangeByID, id), &exchange)
+	return exchange, apperrs.MapErrNotFound(err)
 }
 
 func (db *DB) HasActiveExchange(ctx context.Context, serviceID int) (bool, error) {
@@ -57,11 +57,11 @@ func (db *DB) HasActiveExchange(ctx context.Context, serviceID int) (bool, error
 }
 
 func getExchange(ctx context.Context, tx *sql.Tx, id int) (model.Exchange, error) {
-	var e model.Exchange
-	if err := scanExchange(tx.QueryRowContext(ctx, queryGetExchangeByID+" FOR UPDATE", id), &e); err != nil {
-		return e, apperrs.MapErrNotFound(err)
+	var exchange model.Exchange
+	if err := scanExchange(tx.QueryRowContext(ctx, queryGetExchangeByID+" FOR UPDATE", id), &exchange); err != nil {
+		return exchange, apperrs.MapErrNotFound(err)
 	}
-	return e, nil
+	return exchange, nil
 }
 
 func getServiceCredits(ctx context.Context, tx *sql.Tx, serviceID int) (int, error) {
@@ -75,9 +75,9 @@ func (db *DB) AcceptExchange(ctx context.Context, id int) (model.Exchange, error
 }
 
 func (db *DB) RejectExchange(ctx context.Context, id int) (model.Exchange, error) {
-	var e model.Exchange
-	err := scanExchange(db.QueryRowContext(ctx, queryUpdateExchangeStatus, id, "rejected"), &e)
-	return e, apperrs.MapErrNotFound(err)
+	var exchange model.Exchange
+	err := scanExchange(db.QueryRowContext(ctx, queryUpdateExchangeStatus, id, "rejected"), &exchange)
+	return exchange, apperrs.MapErrNotFound(err)
 }
 
 func (db *DB) CancelExchange(ctx context.Context, id int) (model.Exchange, error) {

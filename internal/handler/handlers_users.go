@@ -22,7 +22,7 @@ import (
 // @Failure 400 {string} string "Requête invalide"
 // @Failure 409 {string} string "Pseudo déjà pris"
 // @Router /api/users [post]
-func HandleCreateUser(s store.UserStore) http.HandlerFunc {
+func HandleCreateUser(userStore store.UserStore) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var body model.UserRequest
 		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
@@ -38,7 +38,7 @@ func HandleCreateUser(s store.UserStore) http.HandlerFunc {
 		ctx, cancel := newCtx(r)
 		defer cancel()
 
-		user, err := s.CreateUser(ctx, body)
+		user, err := userStore.CreateUser(ctx, body)
 		if err != nil {
 			apperrs.RespondUsernameTaken(w, err)
 			return
@@ -60,7 +60,7 @@ func HandleCreateUser(s store.UserStore) http.HandlerFunc {
 // @Failure 400 {string} string "ID invalide"
 // @Failure 404 {string} string "Utilisateur non trouvé"
 // @Router /api/users/{id} [get]
-func HandleGetUser(s store.UserStore) http.HandlerFunc {
+func HandleGetUser(userStore store.UserStore) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		id, err := parseID(r)
 		if err != nil {
@@ -71,7 +71,7 @@ func HandleGetUser(s store.UserStore) http.HandlerFunc {
 		ctx, cancel := newCtx(r)
 		defer cancel()
 
-		user, err := s.GetUserByID(ctx, id)
+		user, err := userStore.GetUserByID(ctx, id)
 		if errors.Is(err, apperrs.ErrNotFound) {
 			apperrs.RespondNotFound(w)
 			return
@@ -81,7 +81,7 @@ func HandleGetUser(s store.UserStore) http.HandlerFunc {
 			return
 		}
 
-		skills, err := s.GetSkillsByUserID(ctx, id)
+		skills, err := userStore.GetSkillsByUserID(ctx, id)
 		if err != nil {
 			apperrs.RespondInternal(w)
 			return
@@ -108,7 +108,7 @@ func HandleGetUser(s store.UserStore) http.HandlerFunc {
 // @Failure 403 {string} string "Accès interdit"
 // @Failure 404 {string} string "Utilisateur non trouvé"
 // @Router /api/users/{id} [put]
-func HandleUpdateUser(s store.UserStore) http.HandlerFunc {
+func HandleUpdateUser(userStore store.UserStore) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		id, isAuthorized := checkSelfAccess(w, r)
 		if !isAuthorized {
@@ -129,7 +129,7 @@ func HandleUpdateUser(s store.UserStore) http.HandlerFunc {
 		ctx, cancel := newCtx(r)
 		defer cancel()
 
-		user, err := s.UpdateUser(ctx, id, body)
+		user, err := userStore.UpdateUser(ctx, id, body)
 		if errors.Is(err, apperrs.ErrNotFound) {
 			apperrs.RespondNotFound(w)
 			return
