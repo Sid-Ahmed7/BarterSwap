@@ -1,4 +1,4 @@
-package main
+﻿package handler
 
 import (
 	"bytes"
@@ -10,8 +10,57 @@ import (
 	"os"
 	"testing"
 
+	"barterswap/internal/model"
+	"barterswap/internal/store"
+
 	_ "github.com/lib/pq"
 )
+
+type (
+	DB              = store.DB
+	User            = model.User
+	Skill           = model.Skill
+	Service         = model.Service
+	Exchange        = model.Exchange
+	Review          = model.Review
+	UserStats       = model.UserStats
+	UserRequest     = model.UserRequest
+	ServiceRequest  = model.ServiceRequest
+	ExchangeRequest = model.ExchangeRequest
+	ReviewRequest   = model.ReviewRequest
+)
+
+func handleCreateUser(s store.UserStore) http.HandlerFunc    { return HandleCreateUser(s) }
+func handleGetUser(s store.UserStore) http.HandlerFunc       { return HandleGetUser(s) }
+func handleUpdateUser(s store.UserStore) http.HandlerFunc    { return HandleUpdateUser(s) }
+func handleGetUserSkills(s store.UserStore) http.HandlerFunc { return HandleGetUserSkills(s) }
+func handleSetUserSkills(s store.UserStore) http.HandlerFunc { return HandleSetUserSkills(s) }
+
+func handleCreateService(s store.ServiceStore) http.HandlerFunc { return HandleCreateService(s) }
+func handleGetService(s store.ServiceStore) http.HandlerFunc    { return HandleGetService(s) }
+func handleUpdateService(s store.ServiceStore) http.HandlerFunc { return HandleUpdateService(s) }
+func handleListServices(s store.ServiceStore) http.HandlerFunc  { return HandleListServices(s) }
+func handleDeleteService(s store.ServiceStore, e store.ExchangeStore) http.HandlerFunc {
+	return HandleDeleteService(s, e)
+}
+
+func handleCreateExchange(e store.ExchangeStore, s store.ServiceStore, u store.UserStore) http.HandlerFunc {
+	return HandleCreateExchange(e, s, u)
+}
+func handleGetExchange(e store.ExchangeStore) http.HandlerFunc      { return HandleGetExchange(e) }
+func handleListExchanges(e store.ExchangeStore) http.HandlerFunc    { return HandleListExchanges(e) }
+func handleAcceptExchange(e store.ExchangeStore) http.HandlerFunc   { return HandleAcceptExchange(e) }
+func handleRejectExchange(e store.ExchangeStore) http.HandlerFunc   { return HandleRejectExchange(e) }
+func handleCancelExchange(e store.ExchangeStore) http.HandlerFunc   { return HandleCancelExchange(e) }
+func handleCompleteExchange(e store.ExchangeStore) http.HandlerFunc { return HandleCompleteExchange(e) }
+
+func handleCreateReview(e store.ExchangeStore, r store.ReviewStore) http.HandlerFunc {
+	return HandleCreateReview(e, r)
+}
+func handleGetUserReviews(r store.ReviewStore) http.HandlerFunc    { return HandleGetUserReviews(r) }
+func handleGetServiceReviews(r store.ReviewStore) http.HandlerFunc { return HandleGetServiceReviews(r) }
+
+func handleGetUserStats(s store.StatsStore) http.HandlerFunc { return HandleGetUserStats(s) }
 
 func setupTestDB(t *testing.T) *DB {
 	t.Helper()
@@ -28,7 +77,7 @@ func setupTestDB(t *testing.T) *DB {
 	}
 	t.Cleanup(func() { sqlDB.Close() })
 	sqlDB.Exec("TRUNCATE users RESTART IDENTITY CASCADE")
-	return &DB{sqlDB}
+	return &DB{DB: sqlDB}
 }
 
 func TestHandleCreateUser_InvalidBody(t *testing.T) {
@@ -52,7 +101,7 @@ func TestHandleCreateUser_EmptyPseudo(t *testing.T) {
 
 func TestHandleCreateUser_Success(t *testing.T) {
 	db := setupTestDB(t)
-	body, _ := json.Marshal(UserRequest{Pseudo: "Itachi", Ville: "Paris", Bio: "Uchiwa légendaire"})
+	body, _ := json.Marshal(UserRequest{Pseudo: "Itachi", Ville: "Paris", Bio: "Uchiwa lÃ©gendaire"})
 	req := httptest.NewRequest(http.MethodPost, "/api/users", bytes.NewReader(body))
 	rr := httptest.NewRecorder()
 	handleCreateUser(db)(rr, req)
@@ -107,7 +156,7 @@ func TestHandleGetUser_NotFound(t *testing.T) {
 
 func TestHandleGetUser_Success(t *testing.T) {
 	db := setupTestDB(t)
-	body, _ := json.Marshal(UserRequest{Pseudo: "Jiraya", Bio: "Sannin légendaire"})
+	body, _ := json.Marshal(UserRequest{Pseudo: "Jiraya", Bio: "Sannin lÃ©gendaire"})
 	req := httptest.NewRequest(http.MethodPost, "/api/users", bytes.NewReader(body))
 	rr := httptest.NewRecorder()
 	handleCreateUser(db)(rr, req)
@@ -206,7 +255,7 @@ func TestHandleSetUserSkills_Success(t *testing.T) {
 	json.NewDecoder(rr.Body).Decode(&created)
 	id := fmt.Sprint(created.ID)
 
-	skills := []Skill{{Nom: "Go", Niveau: "expert"}, {Nom: "SQL", Niveau: "intermédiaire"}}
+	skills := []Skill{{Nom: "Go", Niveau: "expert"}, {Nom: "SQL", Niveau: "intermÃ©diaire"}}
 	body, _ = json.Marshal(skills)
 	req = httptest.NewRequest(http.MethodPut, "/api/users/"+id+"/skills", bytes.NewReader(body))
 	req.SetPathValue("id", id)
@@ -301,7 +350,7 @@ func TestHandleCreateService_Success(t *testing.T) {
 	rr := httptest.NewRecorder()
 	handleCreateService(db)(rr, req)
 	if rr.Code != http.StatusCreated {
-		t.Fatalf("got %d, want 201 — body: %s", rr.Code, rr.Body.String())
+		t.Fatalf("got %d, want 201 â€” body: %s", rr.Code, rr.Body.String())
 	}
 	var svc Service
 	json.NewDecoder(rr.Body).Decode(&svc)
@@ -337,7 +386,7 @@ func TestHandleGetService_NotFound(t *testing.T) {
 func TestHandleGetService_Success(t *testing.T) {
 	db := setupTestDB(t)
 	u := createTestUser(t, db, "svc-carol")
-	setSkills(t, db, u.ID, []Skill{{Nom: "Cuisine", Niveau: "intermédiaire"}})
+	setSkills(t, db, u.ID, []Skill{{Nom: "Cuisine", Niveau: "intermÃ©diaire"}})
 
 	createBody, _ := json.Marshal(ServiceRequest{Titre: "Cours cuisine", Categorie: "Cuisine", DureeMinutes: 90, Credits: 3})
 	req := httptest.NewRequest(http.MethodPost, "/api/services", bytes.NewReader(createBody))
@@ -399,7 +448,7 @@ func TestHandleUpdateService_Forbidden(t *testing.T) {
 	db := setupTestDB(t)
 	u := createTestUser(t, db, "svc-dave")
 	other := createTestUser(t, db, "svc-eve")
-	setSkills(t, db, u.ID, []Skill{{Nom: "Jardinage", Niveau: "débutant"}})
+	setSkills(t, db, u.ID, []Skill{{Nom: "Jardinage", Niveau: "dÃ©butant"}})
 
 	createBody, _ := json.Marshal(ServiceRequest{Titre: "Mon jardin", Categorie: "Jardinage", DureeMinutes: 90, Credits: 2})
 	req := httptest.NewRequest(http.MethodPost, "/api/services", bytes.NewReader(createBody))
@@ -433,19 +482,19 @@ func TestHandleUpdateService_Success(t *testing.T) {
 	var svc Service
 	json.NewDecoder(rr.Body).Decode(&svc)
 
-	updateBody, _ := json.Marshal(ServiceRequest{Titre: "Guitare avancé", Categorie: "Musique", DureeMinutes: 90, Credits: 4})
+	updateBody, _ := json.Marshal(ServiceRequest{Titre: "Guitare avancÃ©", Categorie: "Musique", DureeMinutes: 90, Credits: 4})
 	req = httptest.NewRequest(http.MethodPut, "/api/services/"+fmt.Sprint(svc.ID), bytes.NewReader(updateBody))
 	req.SetPathValue("id", fmt.Sprint(svc.ID))
 	req.Header.Set("X-User-ID", fmt.Sprint(u.ID))
 	rr = httptest.NewRecorder()
 	handleUpdateService(db)(rr, req)
 	if rr.Code != http.StatusOK {
-		t.Fatalf("got %d, want 200 — body: %s", rr.Code, rr.Body.String())
+		t.Fatalf("got %d, want 200 â€” body: %s", rr.Code, rr.Body.String())
 	}
 	var updated Service
 	json.NewDecoder(rr.Body).Decode(&updated)
-	if updated.Titre != "Guitare avancé" {
-		t.Errorf("titre = %q, want 'Guitare avancé'", updated.Titre)
+	if updated.Titre != "Guitare avancÃ©" {
+		t.Errorf("titre = %q, want 'Guitare avancÃ©'", updated.Titre)
 	}
 }
 
@@ -518,7 +567,7 @@ func TestHandleDeleteService_ActiveExchange(t *testing.T) {
 func TestHandleDeleteService_Success(t *testing.T) {
 	db := setupTestDB(t)
 	u := createTestUser(t, db, "svc-ivan")
-	setSkills(t, db, u.ID, []Skill{{Nom: "Cuisine", Niveau: "intermédiaire"}})
+	setSkills(t, db, u.ID, []Skill{{Nom: "Cuisine", Niveau: "intermÃ©diaire"}})
 
 	createBody, _ := json.Marshal(ServiceRequest{Titre: "Cours cuisine", Categorie: "Cuisine", DureeMinutes: 120, Credits: 4})
 	req := httptest.NewRequest(http.MethodPost, "/api/services", bytes.NewReader(createBody))
@@ -559,7 +608,7 @@ func TestHandleListServices_FilterByCategory(t *testing.T) {
 	u := createTestUser(t, db, "svc-judy")
 	setSkills(t, db, u.ID, []Skill{
 		{Nom: "Sport", Niveau: "expert"},
-		{Nom: "Cuisine", Niveau: "débutant"},
+		{Nom: "Cuisine", Niveau: "dÃ©butant"},
 	})
 
 	for _, cat := range []string{"Sport", "Sport", "Cuisine"} {
@@ -614,7 +663,7 @@ func TestHandleListServices_Search(t *testing.T) {
 	u := createTestUser(t, db, "svc-lena")
 	setSkills(t, db, u.ID, []Skill{{Nom: "Musique", Niveau: "expert"}})
 
-	for _, titre := range []string{"Guitare classique", "Guitare électrique", "Piano débutant"} {
+	for _, titre := range []string{"Guitare classique", "Guitare Ã©lectrique", "Piano dÃ©butant"} {
 		body, _ := json.Marshal(ServiceRequest{Titre: titre, Categorie: "Musique", DureeMinutes: 60, Credits: 2})
 		req := httptest.NewRequest(http.MethodPost, "/api/services", bytes.NewReader(body))
 		req.Header.Set("X-User-ID", fmt.Sprint(u.ID))
@@ -643,7 +692,7 @@ func createTestService(t *testing.T, db *DB, userID int, categorie string) Servi
 	rr := httptest.NewRecorder()
 	handleCreateService(db)(rr, req)
 	if rr.Code != http.StatusCreated {
-		t.Fatalf("createTestService: got %d — %s", rr.Code, rr.Body.String())
+		t.Fatalf("createTestService: got %d â€” %s", rr.Code, rr.Body.String())
 	}
 	var svc Service
 	json.NewDecoder(rr.Body).Decode(&svc)
@@ -658,7 +707,7 @@ func createTestExchange(t *testing.T, db *DB, requesterID, serviceID int) Exchan
 	rr := httptest.NewRecorder()
 	handleCreateExchange(db, db, db)(rr, req)
 	if rr.Code != http.StatusCreated {
-		t.Fatalf("createTestExchange: got %d — %s", rr.Code, rr.Body.String())
+		t.Fatalf("createTestExchange: got %d â€” %s", rr.Code, rr.Body.String())
 	}
 	var e Exchange
 	json.NewDecoder(rr.Body).Decode(&e)
@@ -674,7 +723,7 @@ func acceptTestExchange(t *testing.T, db *DB, exchangeID, ownerID int) Exchange 
 	rr := httptest.NewRecorder()
 	handleAcceptExchange(db)(rr, req)
 	if rr.Code != http.StatusOK {
-		t.Fatalf("acceptTestExchange: got %d — %s", rr.Code, rr.Body.String())
+		t.Fatalf("acceptTestExchange: got %d â€” %s", rr.Code, rr.Body.String())
 	}
 	var e Exchange
 	json.NewDecoder(rr.Body).Decode(&e)
@@ -690,7 +739,7 @@ func completeTestExchange(t *testing.T, db *DB, exchangeID, requesterID int) Exc
 	rr := httptest.NewRecorder()
 	handleCompleteExchange(db)(rr, req)
 	if rr.Code != http.StatusOK {
-		t.Fatalf("completeTestExchange: got %d — %s", rr.Code, rr.Body.String())
+		t.Fatalf("completeTestExchange: got %d â€” %s", rr.Code, rr.Body.String())
 	}
 	var e Exchange
 	json.NewDecoder(rr.Body).Decode(&e)
@@ -801,7 +850,7 @@ func TestHandleCreateExchange_Success(t *testing.T) {
 	rr := httptest.NewRecorder()
 	handleCreateExchange(db, db, db)(rr, req)
 	if rr.Code != http.StatusCreated {
-		t.Fatalf("got %d, want 201 — %s", rr.Code, rr.Body.String())
+		t.Fatalf("got %d, want 201 â€” %s", rr.Code, rr.Body.String())
 	}
 	var e Exchange
 	json.NewDecoder(rr.Body).Decode(&e)
@@ -947,7 +996,7 @@ func TestHandleAcceptExchange_Success(t *testing.T) {
 	rr := httptest.NewRecorder()
 	handleAcceptExchange(db)(rr, req)
 	if rr.Code != http.StatusOK {
-		t.Fatalf("got %d, want 200 — %s", rr.Code, rr.Body.String())
+		t.Fatalf("got %d, want 200 â€” %s", rr.Code, rr.Body.String())
 	}
 	var e Exchange
 	json.NewDecoder(rr.Body).Decode(&e)
@@ -989,7 +1038,7 @@ func TestHandleRejectExchange_Success(t *testing.T) {
 	rr := httptest.NewRecorder()
 	handleRejectExchange(db)(rr, req)
 	if rr.Code != http.StatusOK {
-		t.Fatalf("got %d, want 200 — %s", rr.Code, rr.Body.String())
+		t.Fatalf("got %d, want 200 â€” %s", rr.Code, rr.Body.String())
 	}
 	var e Exchange
 	json.NewDecoder(rr.Body).Decode(&e)
@@ -1003,7 +1052,7 @@ func TestHandleCancelExchange_Forbidden(t *testing.T) {
 	owner := createTestUser(t, db, "cancel-owner")
 	requester := createTestUser(t, db, "cancel-requester")
 	third := createTestUser(t, db, "cancel-third")
-	svc := createTestService(t, db, owner.ID, "Déménagement")
+	svc := createTestService(t, db, owner.ID, "DÃ©mÃ©nagement")
 	exchange := createTestExchange(t, db, requester.ID, svc.ID)
 	acceptTestExchange(t, db, exchange.ID, owner.ID)
 
@@ -1051,7 +1100,7 @@ func TestHandleCancelExchange_Success(t *testing.T) {
 	rr := httptest.NewRecorder()
 	handleCancelExchange(db)(rr, req)
 	if rr.Code != http.StatusOK {
-		t.Fatalf("got %d, want 200 — %s", rr.Code, rr.Body.String())
+		t.Fatalf("got %d, want 200 â€” %s", rr.Code, rr.Body.String())
 	}
 	var e Exchange
 	json.NewDecoder(rr.Body).Decode(&e)
@@ -1094,7 +1143,7 @@ func TestHandleCompleteExchange_Success(t *testing.T) {
 	rr := httptest.NewRecorder()
 	handleCompleteExchange(db)(rr, req)
 	if rr.Code != http.StatusOK {
-		t.Fatalf("got %d, want 200 — %s", rr.Code, rr.Body.String())
+		t.Fatalf("got %d, want 200 â€” %s", rr.Code, rr.Body.String())
 	}
 	var e Exchange
 	json.NewDecoder(rr.Body).Decode(&e)
@@ -1186,7 +1235,7 @@ func TestHandleCreateReview_Success(t *testing.T) {
 	rr := httptest.NewRecorder()
 	handleCreateReview(db, db)(rr, req)
 	if rr.Code != http.StatusCreated {
-		t.Fatalf("got %d, want 201 — %s", rr.Code, rr.Body.String())
+		t.Fatalf("got %d, want 201 â€” %s", rr.Code, rr.Body.String())
 	}
 	var r Review
 	json.NewDecoder(rr.Body).Decode(&r)
@@ -1260,7 +1309,7 @@ func TestHandleGetUserReviews_Success(t *testing.T) {
 	rr := httptest.NewRecorder()
 	handleCreateReview(db, db)(rr, req)
 	if rr.Code != http.StatusCreated {
-		t.Fatalf("createReview: got %d — %s", rr.Code, rr.Body.String())
+		t.Fatalf("createReview: got %d â€” %s", rr.Code, rr.Body.String())
 	}
 
 	ownerID := fmt.Sprint(owner.ID)
@@ -1314,7 +1363,7 @@ func TestHandleGetServiceReviews_Success(t *testing.T) {
 	rr := httptest.NewRecorder()
 	handleCreateReview(db, db)(rr, req)
 	if rr.Code != http.StatusCreated {
-		t.Fatalf("createReview: got %d — %s", rr.Code, rr.Body.String())
+		t.Fatalf("createReview: got %d â€” %s", rr.Code, rr.Body.String())
 	}
 
 	svcID := fmt.Sprint(svc.ID)
@@ -1377,7 +1426,7 @@ func TestHandleGetUserStats_Success(t *testing.T) {
 	rr := httptest.NewRecorder()
 	handleGetUserStats(db)(rr, req)
 	if rr.Code != http.StatusOK {
-		t.Fatalf("got %d, want 200 — %s", rr.Code, rr.Body.String())
+		t.Fatalf("got %d, want 200 â€” %s", rr.Code, rr.Body.String())
 	}
 	var stats UserStats
 	json.NewDecoder(rr.Body).Decode(&stats)

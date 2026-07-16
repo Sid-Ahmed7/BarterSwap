@@ -1,10 +1,64 @@
-package main
+﻿package service
 
 import (
 	"context"
+	"database/sql"
 	"errors"
+	"os"
 	"testing"
+
+	apperrs "barterswap/internal/errors"
+	"barterswap/internal/model"
+	"barterswap/internal/store"
+
+	_ "github.com/lib/pq"
 )
+
+type (
+	Skill           = model.Skill
+	UserRequest     = model.UserRequest
+	ServiceRequest  = model.ServiceRequest
+	ExchangeRequest = model.ExchangeRequest
+	Exchange        = model.Exchange
+	DB              = store.DB
+)
+
+var (
+	ErrNotFound            = apperrs.ErrNotFound
+	ErrInsufficientCredits = apperrs.ErrInsufficientCredits
+)
+
+func validateUser(username string) error            { return ValidateUser(username) }
+func validateSkills(skills []Skill) error           { return ValidateSkills(skills) }
+func validateServiceRequest(r ServiceRequest) error { return ValidateServiceRequest(r) }
+
+func processAcceptExchange(ctx context.Context, db *DB, id int) (Exchange, error) {
+	return db.AcceptExchange(ctx, id)
+}
+func processCompleteExchange(ctx context.Context, db *DB, id int) (Exchange, error) {
+	return db.CompleteExchange(ctx, id)
+}
+func processCancelExchange(ctx context.Context, db *DB, id int) (Exchange, error) {
+	return db.CancelExchange(ctx, id)
+}
+
+func setupTestDB(t *testing.T) *DB {
+	t.Helper()
+	dsn := os.Getenv("TEST_DATABASE_URL")
+	if dsn == "" {
+		t.Skip("TEST_DATABASE_URL not set, skipping integration tests")
+	}
+	sqlDB, err := sql.Open("postgres", dsn)
+	if err != nil {
+		t.Fatalf("sql.Open: %v", err)
+	}
+	if err := sqlDB.Ping(); err != nil {
+		t.Skipf("cannot connect to test DB: %v", err)
+	}
+	t.Cleanup(func() { sqlDB.Close() })
+	sqlDB.Exec("TRUNCATE users RESTART IDENTITY CASCADE")
+	return &DB{DB: sqlDB}
+}
 
 func TestValidateUser(t *testing.T) {
 	tests := []struct {
@@ -36,8 +90,8 @@ func TestValidateSkills(t *testing.T) {
 		{"empty list", []Skill{}, false},
 		{"valid skill", []Skill{{Nom: "Go", Niveau: "expert"}}, false},
 		{"all valid levels", []Skill{
-			{Nom: "Go", Niveau: "débutant"},
-			{Nom: "SQL", Niveau: "intermédiaire"},
+			{Nom: "Go", Niveau: "dÃ©butant"},
+			{Nom: "SQL", Niveau: "intermÃ©diaire"},
 			{Nom: "Docker", Niveau: "expert"},
 		}, false},
 		{"empty name", []Skill{{Nom: "", Niveau: "expert"}}, true},
@@ -45,7 +99,7 @@ func TestValidateSkills(t *testing.T) {
 		{"empty level", []Skill{{Nom: "Go", Niveau: ""}}, true},
 		{"one invalid among several", []Skill{
 			{Nom: "Go", Niveau: "expert"},
-			{Nom: "", Niveau: "débutant"},
+			{Nom: "", Niveau: "dÃ©butant"},
 		}, true},
 	}
 	for _, tt := range tests {

@@ -1,4 +1,4 @@
-package main
+﻿package middleware
 
 import (
 	"bytes"
@@ -109,7 +109,7 @@ func TestBuildHandler(t *testing.T) {
 		writer.WriteHeader(http.StatusOK)
 	})
 
-	handlerChain := buildHandler(nextHandler)
+	handlerChain := BuildHandler(nextHandler)
 
 	recorder := httptest.NewRecorder()
 	request := httptest.NewRequest(http.MethodGet, "/api/test", nil)

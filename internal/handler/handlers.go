@@ -1,4 +1,4 @@
-package main
+package handler
 
 import (
 	"context"
@@ -6,6 +6,9 @@ import (
 	"net/http"
 	"strconv"
 	"time"
+
+	apperrs "barterswap/internal/errors"
+	"barterswap/internal/store"
 )
 
 const dbTimeout = 5 * time.Second
@@ -22,43 +25,40 @@ func parseUserID(r *http.Request) (int, error) {
 	return strconv.Atoi(r.Header.Get("X-User-ID"))
 }
 
-
-
-
 func checkSelfAccess(w http.ResponseWriter, r *http.Request) (int, bool) {
 	id, err := parseID(r)
 	if err != nil {
-		errBadRequest(w, "invalid id")
+		apperrs.RespondBadRequest(w, "invalid id")
 		return 0, false
 	}
 	userID, err := parseUserID(r)
 	if err != nil || userID != id {
-		errForbidden(w)
+		apperrs.RespondForbidden(w)
 		return 0, false
 	}
 	return id, true
 }
 
-func checkUserExists(w http.ResponseWriter, store UserStore, ctx context.Context, id int) bool {
-	if _, err := store.GetUserByID(ctx, id); err != nil {
-		if errors.Is(err, ErrNotFound) {
-			errNotFound(w)
+func checkUserExists(w http.ResponseWriter, s store.UserStore, ctx context.Context, id int) bool {
+	if _, err := s.GetUserByID(ctx, id); err != nil {
+		if errors.Is(err, apperrs.ErrNotFound) {
+			apperrs.RespondNotFound(w)
 			return false
 		}
-		errInternal(w)
+		apperrs.RespondInternal(w)
 		return false
 	}
 	return true
 }
 
-func checkSkillsForCategory(w http.ResponseWriter, store ServiceStore, ctx context.Context, userID int, categorie string) bool {
-	hasSkills, err := store.HasSkillsForCategory(ctx, userID, categorie)
+func checkSkillsForCategory(w http.ResponseWriter, s store.ServiceStore, ctx context.Context, userID int, categorie string) bool {
+	hasSkills, err := s.HasSkillsForCategory(ctx, userID, categorie)
 	if err != nil {
-		errInternal(w)
+		apperrs.RespondInternal(w)
 		return false
 	}
 	if !hasSkills {
-		errBadRequest(w, "User does not have skills for this category")
+		apperrs.RespondBadRequest(w, "User does not have skills for this category")
 		return false
 	}
 	return true

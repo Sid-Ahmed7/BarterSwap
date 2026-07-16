@@ -1,29 +1,39 @@
-package main
+package store
 
-import "context"
+import (
+	"context"
+	"database/sql"
 
-func (db *DB) CreateReview(ctx context.Context, exchangeID int, authorID int, req ReviewRequest) (Review, error) {
-	var r Review
+	apperrs "barterswap/internal/errors"
+	"barterswap/internal/model"
+)
+
+func scanReview(row *sql.Row, r *model.Review) error {
+	return row.Scan(&r.ID, &r.ExchangeID, &r.AuthorID, &r.TargetID, &r.Note, &r.Commentaire, &r.CreatedAt)
+}
+
+func (db *DB) CreateReview(ctx context.Context, exchangeID int, authorID int, req model.ReviewRequest) (model.Review, error) {
+	var r model.Review
 	exchange, err := db.GetExchangeByID(ctx, exchangeID)
 	if err != nil {
 		return r, err
 	}
 
 	if exchange.Status != "completed" {
-		return r, ErrNotCompleted
+		return r, apperrs.ErrNotCompleted
 	}
 
 	if exchange.RequesterID != authorID && exchange.OwnerID != authorID {
-		return r, ErrForbidden
+		return r, apperrs.ErrForbidden
 	}
-	var count int
 
+	var count int
 	if err = db.QueryRowContext(ctx, queryHasReview, exchangeID, authorID).Scan(&count); err != nil {
 		return r, err
 	}
 
 	if count > 0 {
-		return r, ErrAlreadyReviewed
+		return r, apperrs.ErrAlreadyReviewed
 	}
 
 	targetID := exchange.OwnerID
@@ -35,16 +45,16 @@ func (db *DB) CreateReview(ctx context.Context, exchangeID int, authorID int, re
 	return r, err
 }
 
-func (db *DB) GetReviewsByUserID(ctx context.Context, userID int) ([]Review, error) {
+func (db *DB) GetReviewsByUserID(ctx context.Context, userID int) ([]model.Review, error) {
 	rows, err := db.QueryContext(ctx, queryGetReviewsByUserID, userID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 
-	var reviews []Review
+	var reviews []model.Review
 	for rows.Next() {
-		var r Review
+		var r model.Review
 		if err := rows.Scan(&r.ID, &r.ExchangeID, &r.AuthorID, &r.TargetID, &r.Note, &r.Commentaire, &r.CreatedAt); err != nil {
 			return nil, err
 		}
@@ -53,16 +63,16 @@ func (db *DB) GetReviewsByUserID(ctx context.Context, userID int) ([]Review, err
 	return reviews, rows.Err()
 }
 
-func (db *DB) GetReviewsByServiceID(ctx context.Context, serviceID int) ([]Review, error) {
+func (db *DB) GetReviewsByServiceID(ctx context.Context, serviceID int) ([]model.Review, error) {
 	rows, err := db.QueryContext(ctx, queryGetReviewsByServiceID, serviceID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 
-	var reviews []Review
+	var reviews []model.Review
 	for rows.Next() {
-		var r Review
+		var r model.Review
 		if err := rows.Scan(&r.ID, &r.ExchangeID, &r.AuthorID, &r.TargetID, &r.Note, &r.Commentaire, &r.CreatedAt); err != nil {
 			return nil, err
 		}

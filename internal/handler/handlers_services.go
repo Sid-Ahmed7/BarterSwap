@@ -1,51 +1,54 @@
-package main
+package handler
 
 import (
 	"encoding/json"
 	"errors"
 	"net/http"
+
+	apperrs "barterswap/internal/errors"
+	"barterswap/internal/model"
+	"barterswap/internal/service"
+	"barterswap/internal/store"
 )
 
-// handleCreateService godoc
+// HandleCreateService godoc
 // @Summary Créer une annonce de service
-// @Description Publie une nouvelle annonce de service par le prestataire connecté (requiert la compétence correspondante).
 // @Tags Services
 // @Accept json
 // @Produce json
 // @Param X-User-ID header int true "ID du prestataire"
-// @Param service body ServiceRequest true "Données du service"
-// @Success 201 {object} Service
+// @Param service body model.ServiceRequest true "Données du service"
+// @Success 201 {object} model.Service
 // @Failure 400 {string} string "Requête ou compétence invalide"
-// @Failure 403 {string} string "Accès interdit"
 // @Router /api/services [post]
-func handleCreateService(store ServiceStore) http.HandlerFunc {
+func HandleCreateService(storeService store.ServiceStore) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		userID, err := parseUserID(r)
 		if err != nil {
-			errBadRequest(w, "Invalid or missing X-User-ID header")
+			apperrs.RespondBadRequest(w, "Invalid or missing X-User-ID header")
 			return
 		}
 
-		var body ServiceRequest
+		var body model.ServiceRequest
 		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-			errBadRequest(w, "Invalid body")
+			apperrs.RespondBadRequest(w, "Invalid body")
 			return
 		}
 
-		if err := validateServiceRequest(body); err != nil {
-			errBadRequest(w, err.Error())
+		if err := service.ValidateServiceRequest(body); err != nil {
+			apperrs.RespondBadRequest(w, err.Error())
 			return
 		}
 
 		ctx, cancel := newCtx(r)
 		defer cancel()
 
-		if !checkSkillsForCategory(w, store, ctx, userID, body.Categorie) {
+		if !checkSkillsForCategory(w, storeService, ctx, userID, body.Categorie) {
 			return
 		}
-		service, err := store.CreateService(ctx, userID, body)
+		service, err := storeService.CreateService(ctx, userID, body)
 		if err != nil {
-			errInternal(w)
+			apperrs.RespondInternal(w)
 			return
 		}
 
@@ -55,37 +58,36 @@ func handleCreateService(store ServiceStore) http.HandlerFunc {
 	}
 }
 
-// handleGetService godoc
+// HandleGetService godoc
 // @Summary Obtenir le détail d'un service
-// @Description Récupère les informations d'un service actif par son ID.
 // @Tags Services
 // @Produce json
 // @Param id path int true "ID du service"
-// @Success 200 {object} Service
+// @Success 200 {object} model.Service
 // @Failure 400 {string} string "ID invalide"
-// @Failure 404 {string} string "Service non trouvé ou inactif"
+// @Failure 404 {string} string "Service non trouvé"
 // @Router /api/services/{id} [get]
-func handleGetService(store ServiceStore) http.HandlerFunc {
+func HandleGetService(s store.ServiceStore) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		id, err := parseID(r)
 		if err != nil {
-			errBadRequest(w, "Invalid id")
+			apperrs.RespondBadRequest(w, "Invalid id")
 			return
 		}
 		ctx, cancel := newCtx(r)
 		defer cancel()
 
-		service, err := store.GetServiceByID(ctx, id)
-		if errors.Is(err, ErrNotFound) {
-			errNotFound(w)
+		service, err := s.GetServiceByID(ctx, id)
+		if errors.Is(err, apperrs.ErrNotFound) {
+			apperrs.RespondNotFound(w)
 			return
 		}
 		if err != nil {
-			errInternal(w)
+			apperrs.RespondInternal(w)
 			return
 		}
 		if !service.Actif {
-			errNotFound(w)
+			apperrs.RespondNotFound(w)
 			return
 		}
 
@@ -95,33 +97,32 @@ func handleGetService(store ServiceStore) http.HandlerFunc {
 	}
 }
 
-// handleListServices godoc
+// HandleListServices godoc
 // @Summary Rechercher des services
-// @Description Liste les services actifs avec filtres optionnels par catégorie, ville et recherche plein texte.
 // @Tags Services
 // @Produce json
 // @Param categorie query string false "Filtrer par catégorie"
 // @Param ville query string false "Filtrer par ville"
 // @Param search query string false "Recherche plein texte"
-// @Success 200 {array} Service
+// @Success 200 {array} model.Service
 // @Router /api/services [get]
-func handleListServices(store ServiceStore) http.HandlerFunc {
+func HandleListServices(storeService store.ServiceStore) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		query := r.URL.Query()
 		ctx, cancel := newCtx(r)
 		defer cancel()
 
-		services, err := store.ListServices(ctx, ServiceListRequest{
+		services, err := storeService.ListServices(ctx, model.ServiceListRequest{
 			Categorie: query.Get("categorie"),
 			Ville:     query.Get("ville"),
 			Search:    query.Get("search"),
 		})
 		if err != nil {
-			errInternal(w)
+			apperrs.RespondInternal(w)
 			return
 		}
 		if services == nil {
-			services = []Service{}
+			services = []model.Service{}
 		}
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
@@ -129,80 +130,79 @@ func handleListServices(store ServiceStore) http.HandlerFunc {
 	}
 }
 
-// handleUpdateService godoc
+// HandleUpdateService godoc
 // @Summary Modifier un service
-// @Description Met à jour le titre, la description, la catégorie, la durée ou les crédits d'un service existant. Le prestataire connecté doit être le propriétaire du service.
 // @Tags Services
 // @Accept json
 // @Produce json
 // @Param id path int true "ID du service"
 // @Param X-User-ID header int true "ID du prestataire"
-// @Param service body ServiceRequest true "Nouvelles données du service"
-// @Success 200 {object} Service
+// @Param service body model.ServiceRequest true "Nouvelles données du service"
+// @Success 200 {object} model.Service
 // @Failure 400 {string} string "Requête invalide"
 // @Failure 403 {string} string "Accès interdit"
 // @Failure 404 {string} string "Service non trouvé"
 // @Router /api/services/{id} [put]
-func handleUpdateService(store ServiceStore) http.HandlerFunc {
+func HandleUpdateService(s store.ServiceStore) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		id, err := parseID(r)
 		if err != nil {
-			errBadRequest(w, "Invalid id")
+			apperrs.RespondBadRequest(w, "Invalid id")
 			return
 		}
 		userID, err := parseUserID(r)
 		if err != nil {
-			errBadRequest(w, "Invalid or missing X-User-ID header")
+			apperrs.RespondBadRequest(w, "Invalid or missing X-User-ID header")
 			return
 		}
+
+		var body model.ServiceRequest
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			apperrs.RespondBadRequest(w, "Invalid body")
+			return
+		}
+
+		if err := service.ValidateServiceRequest(body); err != nil {
+			apperrs.RespondBadRequest(w, err.Error())
+			return
+		}
+
 		ctx, cancel := newCtx(r)
 		defer cancel()
 
-		service, err := store.GetServiceByID(ctx, id)
-		if errors.Is(err, ErrNotFound) {
-			errNotFound(w)
+		service, err := s.GetServiceByID(ctx, id)
+		if errors.Is(err, apperrs.ErrNotFound) {
+			apperrs.RespondNotFound(w)
 			return
 		}
 		if err != nil {
-			errInternal(w)
+			apperrs.RespondInternal(w)
 			return
 		}
 
 		if service.ProviderID != userID {
-			errForbidden(w)
+			apperrs.RespondForbidden(w)
 			return
 		}
 
-		var body ServiceRequest
-		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-			errBadRequest(w, "Invalid body")
+		if !checkSkillsForCategory(w, s, ctx, userID, body.Categorie) {
 			return
 		}
 
-		if err := validateServiceRequest(body); err != nil {
-			errBadRequest(w, err.Error())
-			return
-		}
-
-		if !checkSkillsForCategory(w, store, ctx, userID, body.Categorie) {
-			return
-		}
-
-		updatedService, err := store.UpdateService(ctx, id, body)
+		updated, err := s.UpdateService(ctx, id, body)
 		if err != nil {
-			errInternal(w)
+			apperrs.RespondInternal(w)
 			return
 		}
 
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(updatedService)
+		json.NewEncoder(w).Encode(updated)
 	}
 }
 
-// handleDeleteService godoc
+// HandleDeleteService godoc
 // @Summary Désactiver un service
-// @Description Désactive un service (l'annonce ne sera plus visible ni disponible). Le prestataire connecté doit être le propriétaire du service et il ne doit pas y avoir d'échange actif.
 // @Tags Services
 // @Param id path int true "ID du service"
 // @Param X-User-ID header int true "ID du prestataire"
@@ -212,48 +212,48 @@ func handleUpdateService(store ServiceStore) http.HandlerFunc {
 // @Failure 404 {string} string "Service non trouvé"
 // @Failure 409 {string} string "Conflit (échange en cours)"
 // @Router /api/services/{id} [delete]
-func handleDeleteService(store ServiceStore, exchangeStore ExchangeStore) http.HandlerFunc {
+func HandleDeleteService(s store.ServiceStore, exchangeStore store.ExchangeStore) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		id, err := parseID(r)
 		if err != nil {
-			errBadRequest(w, "Invalid id")
+			apperrs.RespondBadRequest(w, "Invalid id")
 			return
 		}
 		userID, err := parseUserID(r)
 		if err != nil {
-			errBadRequest(w, "Invalid or missing X-User-ID header")
+			apperrs.RespondBadRequest(w, "Invalid or missing X-User-ID header")
 			return
 		}
 
 		ctx, cancel := newCtx(r)
 		defer cancel()
 
-		svc, err := store.GetServiceByID(ctx, id)
-		if errors.Is(err, ErrNotFound) {
-			errNotFound(w)
+		service, err := s.GetServiceByID(ctx, id)
+		if errors.Is(err, apperrs.ErrNotFound) {
+			apperrs.RespondNotFound(w)
 			return
 		}
 		if err != nil {
-			errInternal(w)
+			apperrs.RespondInternal(w)
 			return
 		}
-		if svc.ProviderID != userID {
-			errForbidden(w)
+		if service.ProviderID != userID {
+			apperrs.RespondForbidden(w)
 			return
 		}
 
 		hasActive, err := exchangeStore.HasActiveExchange(ctx, id)
 		if err != nil {
-			errInternal(w)
+			apperrs.RespondInternal(w)
 			return
 		}
 		if hasActive {
-			errConflict(w, "Service has an active exchange")
+			apperrs.RespondConflict(w, "Service has an active exchange")
 			return
 		}
 
-		if err := store.DeleteService(ctx, id); err != nil {
-			errInternal(w)
+		if err := s.DeleteService(ctx, id); err != nil {
+			apperrs.RespondInternal(w)
 			return
 		}
 		w.WriteHeader(http.StatusNoContent)
