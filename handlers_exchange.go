@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"errors"
 	"net/http"
 )
@@ -27,7 +28,7 @@ func handleCreateExchange(exchangeStore ExchangeStore, serviceStore ServiceStore
 		}
 
 		var body ExchangeRequest
-		if err := decodeJSONBody(r, &body); err != nil {
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 			errBadRequest(w, "Invalid body")
 			return
 		}
@@ -84,7 +85,9 @@ func handleCreateExchange(exchangeStore ExchangeStore, serviceStore ServiceStore
 			return
 		}
 
-		respondJSON(w, http.StatusCreated, exchange)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusCreated)
+		json.NewEncoder(w).Encode(exchange)
 	}
 }
 
@@ -118,7 +121,9 @@ func handleListExchanges(exchangeStore ExchangeStore) http.HandlerFunc {
 			exchanges = []Exchange{}
 		}
 
-		respondJSON(w, http.StatusOK, exchanges)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(exchanges)
 	}
 }
 
@@ -154,7 +159,9 @@ func handleGetExchange(exchangeStore ExchangeStore) http.HandlerFunc {
 			return
 		}
 
-		respondJSON(w, http.StatusOK, exchange)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(exchange)
 	}
 }
 
@@ -209,10 +216,6 @@ func handleAcceptExchange(exchangeStore ExchangeStore) http.HandlerFunc {
 		}
 
 		exchange, err = exchangeStore.AcceptExchange(ctx, id)
-		if errors.Is(err, ErrBadStatus) {
-			errBadRequest(w, "Only pending exchanges can be accepted")
-			return
-		}
 		if errors.Is(err, ErrInsufficientCredits) {
 			errBadRequest(w, "Insufficient credits")
 			return
@@ -222,7 +225,9 @@ func handleAcceptExchange(exchangeStore ExchangeStore) http.HandlerFunc {
 			return
 		}
 
-		respondJSON(w, http.StatusOK, exchange)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(exchange)
 	}
 }
 
@@ -282,7 +287,9 @@ func handleCancelExchange(exchangeStore ExchangeStore) http.HandlerFunc {
 			return
 		}
 
-		respondJSON(w, http.StatusOK, updatedExchange)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(updatedExchange)
 	}
 }
 
@@ -342,7 +349,9 @@ func handleRejectExchange(exchangeStore ExchangeStore) http.HandlerFunc {
 			return
 		}
 
-		respondJSON(w, http.StatusOK, updatedExchange)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(updatedExchange)
 	}
 }
 
@@ -397,15 +406,13 @@ func handleCompleteExchange(exchangeStore ExchangeStore) http.HandlerFunc {
 		}
 
 		updatedExchange, err := exchangeStore.CompleteExchange(ctx, id)
-		if errors.Is(err, ErrBadStatus) {
-			errBadRequest(w, "Only accepted exchanges can be completed")
-			return
-		}
 		if err != nil {
 			errInternal(w)
 			return
 		}
 
-		respondJSON(w, http.StatusOK, updatedExchange)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(updatedExchange)
 	}
 }

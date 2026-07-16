@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"errors"
 	"net/http"
 )
@@ -35,7 +36,7 @@ func handleCreateReview(exchangeStore ExchangeStore, reviewStore ReviewStore) ht
 		}
 
 		var body ReviewRequest
-		if err := decodeJSONBody(r, &body); err != nil {
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 			errBadRequest(w, "Invalid body")
 			return
 		}
@@ -71,7 +72,9 @@ func handleCreateReview(exchangeStore ExchangeStore, reviewStore ReviewStore) ht
 			return
 		}
 
-		respondJSON(w, http.StatusCreated, review)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusCreated)
+		json.NewEncoder(w).Encode(review)
 	}
 }
 
@@ -104,7 +107,9 @@ func handleGetUserReviews(reviewStore ReviewStore) http.HandlerFunc {
 			reviews = []Review{}
 		}
 
-		respondJSON(w, http.StatusOK, reviews)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(reviews)
 	}
 }
 
@@ -137,6 +142,8 @@ func handleGetServiceReviews(reviewStore ReviewStore) http.HandlerFunc {
 			reviews = []Review{}
 		}
 
-		respondJSON(w, http.StatusOK, reviews)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(reviews)
 	}
 }

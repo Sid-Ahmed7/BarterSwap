@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"errors"
 	"net/http"
 )
@@ -19,7 +20,7 @@ import (
 func handleCreateUser(store UserStore) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var body UserRequest
-		if err := decodeJSONBody(r, &body); err != nil {
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 			errBadRequest(w, "invalid body")
 			return
 		}
@@ -38,7 +39,9 @@ func handleCreateUser(store UserStore) http.HandlerFunc {
 			return
 		}
 
-		respondJSON(w, http.StatusCreated, user)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusCreated)
+		json.NewEncoder(w).Encode(user)
 	}
 }
 
@@ -80,7 +83,9 @@ func handleGetUser(store UserStore) http.HandlerFunc {
 		}
 		user.Skills = skills
 
-		respondJSON(w, http.StatusOK, user)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(user)
 	}
 }
 
@@ -106,7 +111,7 @@ func handleUpdateUser(store UserStore) http.HandlerFunc {
 		}
 
 		var body UserRequest
-		if err := decodeJSONBody(r, &body); err != nil {
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 			errBadRequest(w, "invalid body")
 			return
 		}
@@ -129,7 +134,9 @@ func handleUpdateUser(store UserStore) http.HandlerFunc {
 			return
 		}
 
-		respondJSON(w, http.StatusOK, user)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(user)
 	}
 }
 
@@ -167,7 +174,9 @@ func handleGetUserSkills(store UserStore) http.HandlerFunc {
 			skills = []Skill{}
 		}
 
-		respondJSON(w, http.StatusOK, skills)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(skills)
 	}
 }
 
@@ -193,7 +202,7 @@ func handleSetUserSkills(store UserStore) http.HandlerFunc {
 		}
 
 		var skills []Skill
-		if err := decodeJSONBody(r, &skills); err != nil {
+		if err := json.NewDecoder(r.Body).Decode(&skills); err != nil {
 			errBadRequest(w, "invalid body")
 			return
 		}
@@ -215,6 +224,8 @@ func handleSetUserSkills(store UserStore) http.HandlerFunc {
 			return
 		}
 
-		respondJSON(w, http.StatusOK, skills)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(skills)
 	}
 }

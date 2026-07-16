@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"net/http"
 	"strconv"
@@ -23,15 +22,8 @@ func parseUserID(r *http.Request) (int, error) {
 	return strconv.Atoi(r.Header.Get("X-User-ID"))
 }
 
-func decodeJSONBody(r *http.Request, body interface{}) error {
-	return json.NewDecoder(r.Body).Decode(body)
-}
 
-func respondJSON(w http.ResponseWriter, status int, response interface{}) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
-	json.NewEncoder(w).Encode(response)
-}
+
 
 func checkSelfAccess(w http.ResponseWriter, r *http.Request) (int, bool) {
 	id, err := parseID(r)

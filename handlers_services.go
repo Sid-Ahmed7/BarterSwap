@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"errors"
 	"net/http"
 )
@@ -26,7 +27,7 @@ func handleCreateService(store ServiceStore) http.HandlerFunc {
 		}
 
 		var body ServiceRequest
-		if err := decodeJSONBody(r, &body); err != nil {
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 			errBadRequest(w, "Invalid body")
 			return
 		}
@@ -48,7 +49,9 @@ func handleCreateService(store ServiceStore) http.HandlerFunc {
 			return
 		}
 
-		respondJSON(w, http.StatusCreated, service)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusCreated)
+		json.NewEncoder(w).Encode(service)
 	}
 }
 
@@ -86,7 +89,9 @@ func handleGetService(store ServiceStore) http.HandlerFunc {
 			return
 		}
 
-		respondJSON(w, http.StatusOK, service)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(service)
 	}
 }
 
@@ -118,7 +123,9 @@ func handleListServices(store ServiceStore) http.HandlerFunc {
 		if services == nil {
 			services = []Service{}
 		}
-		respondJSON(w, http.StatusOK, services)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(services)
 	}
 }
 
@@ -167,7 +174,7 @@ func handleUpdateService(store ServiceStore) http.HandlerFunc {
 		}
 
 		var body ServiceRequest
-		if err := decodeJSONBody(r, &body); err != nil {
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 			errBadRequest(w, "Invalid body")
 			return
 		}
@@ -187,7 +194,9 @@ func handleUpdateService(store ServiceStore) http.HandlerFunc {
 			return
 		}
 
-		respondJSON(w, http.StatusOK, updatedService)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(updatedService)
 	}
 }
 

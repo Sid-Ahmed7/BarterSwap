@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"errors"
 	"net/http"
 )
@@ -36,6 +37,8 @@ func handleGetUserStats(statsStore StatsStore) http.HandlerFunc {
 			return
 		}
 
-		respondJSON(w, http.StatusOK, stats)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(stats)
 	}
 }
