@@ -5,6 +5,19 @@ import (
 	"net/http"
 )
 
+// handleCreateExchange godoc
+// @Summary Créer une demande d'échange
+// @Description Crée une nouvelle demande d'échange pour un service spécifié. L'utilisateur connecté doit disposer d'assez de crédits.
+// @Tags Exchanges
+// @Accept json
+// @Produce json
+// @Param X-User-ID header int true "ID de l'utilisateur connecté"
+// @Param exchange body ExchangeRequest true "Détails de la demande d'échange"
+// @Success 201 {object} Exchange
+// @Failure 400 {string} string "Requête invalide ou crédits insuffisants"
+// @Failure 404 {string} string "Service ou demandeur non trouvé"
+// @Failure 409 {string} string "Conflit (échange déjà actif)"
+// @Router /api/exchanges [post]
 func handleCreateExchange(exchangeStore ExchangeStore, serviceStore ServiceStore, userStore UserStore) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		userID, err := parseUserID(r)
@@ -75,6 +88,16 @@ func handleCreateExchange(exchangeStore ExchangeStore, serviceStore ServiceStore
 	}
 }
 
+// handleListExchanges godoc
+// @Summary Lister mes échanges
+// @Description Récupère la liste des demandes d'échanges (en tant que demandeur ou prestataire) pour l'utilisateur connecté, avec filtre par statut optionnel.
+// @Tags Exchanges
+// @Produce json
+// @Param X-User-ID header int true "ID de l'utilisateur connecté"
+// @Param status query string false "Filtrer par statut (pending, accepted, rejected, cancelled, completed)"
+// @Success 200 {array} Exchange
+// @Failure 400 {string} string "En-tête manquant"
+// @Router /api/exchanges [get]
 func handleListExchanges(exchangeStore ExchangeStore) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		userID, err := parseUserID(r)
@@ -99,6 +122,16 @@ func handleListExchanges(exchangeStore ExchangeStore) http.HandlerFunc {
 	}
 }
 
+// handleGetExchange godoc
+// @Summary Obtenir le détail d'un échange
+// @Description Récupère les détails d'un échange par son ID.
+// @Tags Exchanges
+// @Produce json
+// @Param id path int true "ID de l'échange"
+// @Success 200 {object} Exchange
+// @Failure 400 {string} string "ID invalide"
+// @Failure 404 {string} string "Échange non trouvé"
+// @Router /api/exchanges/{id} [get]
 func handleGetExchange(exchangeStore ExchangeStore) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		id, err := parseID(r)
@@ -125,6 +158,18 @@ func handleGetExchange(exchangeStore ExchangeStore) http.HandlerFunc {
 	}
 }
 
+// handleAcceptExchange godoc
+// @Summary Accepter une demande d'échange
+// @Description Accepte une demande d'échange en cours. Seul le propriétaire du service peut accepter et cela débite les crédits correspondants au demandeur.
+// @Tags Exchanges
+// @Produce json
+// @Param id path int true "ID de l'échange"
+// @Param X-User-ID header int true "ID du propriétaire"
+// @Success 200 {object} Exchange
+// @Failure 400 {string} string "Requête invalide ou crédits insuffisants"
+// @Failure 403 {string} string "Accès interdit"
+// @Failure 404 {string} string "Échange non trouvé"
+// @Router /api/exchanges/{id}/accept [put]
 func handleAcceptExchange(exchangeStore ExchangeStore) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		id, err := parseID(r)
@@ -181,6 +226,18 @@ func handleAcceptExchange(exchangeStore ExchangeStore) http.HandlerFunc {
 	}
 }
 
+// handleCancelExchange godoc
+// @Summary Annuler un échange
+// @Description Annule un échange en cours. Le demandeur et le prestataire peuvent tous deux l'annuler. Si l'échange était accepté, le demandeur est remboursé.
+// @Tags Exchanges
+// @Produce json
+// @Param id path int true "ID de l'échange"
+// @Param X-User-ID header int true "ID de l'utilisateur connecté"
+// @Success 200 {object} Exchange
+// @Failure 400 {string} string "Statut invalide"
+// @Failure 403 {string} string "Accès interdit"
+// @Failure 404 {string} string "Échange non trouvé"
+// @Router /api/exchanges/{id}/cancel [put]
 func handleCancelExchange(exchangeStore ExchangeStore) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		id, err := parseID(r)
@@ -229,6 +286,18 @@ func handleCancelExchange(exchangeStore ExchangeStore) http.HandlerFunc {
 	}
 }
 
+// handleRejectExchange godoc
+// @Summary Refuser une demande d'échange
+// @Description Refuse une demande d'échange en cours. Seul le propriétaire du service peut la refuser.
+// @Tags Exchanges
+// @Produce json
+// @Param id path int true "ID de l'échange"
+// @Param X-User-ID header int true "ID du propriétaire"
+// @Success 200 {object} Exchange
+// @Failure 400 {string} string "Statut invalide"
+// @Failure 403 {string} string "Accès interdit"
+// @Failure 404 {string} string "Échange non trouvé"
+// @Router /api/exchanges/{id}/reject [put]
 func handleRejectExchange(exchangeStore ExchangeStore) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		id, err := parseID(r)
@@ -277,6 +346,18 @@ func handleRejectExchange(exchangeStore ExchangeStore) http.HandlerFunc {
 	}
 }
 
+// handleCompleteExchange godoc
+// @Summary Marquer un échange comme terminé
+// @Description Termine un échange. Seul le demandeur peut le valider une fois le service rendu, ce qui transfère les crédits au prestataire.
+// @Tags Exchanges
+// @Produce json
+// @Param id path int true "ID de l'échange"
+// @Param X-User-ID header int true "ID du demandeur"
+// @Success 200 {object} Exchange
+// @Failure 400 {string} string "Statut invalide"
+// @Failure 403 {string} string "Accès interdit"
+// @Failure 404 {string} string "Échange non trouvé"
+// @Router /api/exchanges/{id}/complete [put]
 func handleCompleteExchange(exchangeStore ExchangeStore) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		id, err := parseID(r)

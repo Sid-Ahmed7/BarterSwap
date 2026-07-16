@@ -5,6 +5,21 @@ import (
 	"net/http"
 )
 
+// handleCreateReview godoc
+// @Summary Laisser un avis
+// @Description Enregistre un avis (note et commentaire) pour un échange terminé. L'auteur doit être le demandeur ou le prestataire de l'échange.
+// @Tags Reviews
+// @Accept json
+// @Produce json
+// @Param id path int true "ID de l'échange"
+// @Param X-User-ID header int true "ID de l'auteur"
+// @Param review body ReviewRequest true "Détails de l'avis"
+// @Success 201 {object} Review
+// @Failure 400 {string} string "Requête invalide ou échange non terminé"
+// @Failure 403 {string} string "Accès interdit"
+// @Failure 404 {string} string "Échange non trouvé"
+// @Failure 409 {string} string "Avis déjà soumis"
+// @Router /api/exchanges/{id}/review [post]
 func handleCreateReview(exchangeStore ExchangeStore, reviewStore ReviewStore) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		exchangeID, err := parseID(r)
@@ -60,6 +75,15 @@ func handleCreateReview(exchangeStore ExchangeStore, reviewStore ReviewStore) ht
 	}
 }
 
+// handleGetUserReviews godoc
+// @Summary Obtenir les avis reçus par un utilisateur
+// @Description Récupère la liste de tous les avis laissés sur le profil d'un utilisateur par son ID.
+// @Tags Reviews
+// @Produce json
+// @Param id path int true "ID de l'utilisateur cible"
+// @Success 200 {array} Review
+// @Failure 400 {string} string "ID invalide"
+// @Router /api/users/{id}/reviews [get]
 func handleGetUserReviews(reviewStore ReviewStore) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		id, err := parseID(r)
@@ -84,6 +108,15 @@ func handleGetUserReviews(reviewStore ReviewStore) http.HandlerFunc {
 	}
 }
 
+// handleGetServiceReviews godoc
+// @Summary Obtenir les avis sur un service
+// @Description Récupère la liste de tous les avis laissés sur un service spécifique par son ID.
+// @Tags Reviews
+// @Produce json
+// @Param id path int true "ID du service"
+// @Success 200 {array} Review
+// @Failure 400 {string} string "ID invalide"
+// @Router /api/services/{id}/reviews [get]
 func handleGetServiceReviews(reviewStore ReviewStore) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		id, err := parseID(r)

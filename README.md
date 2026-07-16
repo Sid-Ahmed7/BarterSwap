@@ -15,6 +15,7 @@ docker compose up --build
 ```
 
 L'API est disponible sur `http://localhost:8080`.
+La documentation interactive Swagger est disponible sur `http://localhost:8080/swagger/index.html`.
 
 ## Variables d'environnement
 
@@ -26,7 +27,8 @@ Définies dans le fichier `.env` à la racine :
 | POSTGRES_PASSWORD | Mot de passe PostgreSQL  |
 | POSTGRES_DB       | Nom de la base           |
 | DB_HOST           | Hôte de la base          | 
-| DB_PORT           | Port PostgreSQL          |
+| DB_PORT           | Port PostgreSQL interne  |
+| DB_EXPOSED_PORT   | Port PostgreSQL exposé sur l'hôte |
 | SERVER_PORT       | Port du serveur HTTP     | 
 
 > L'authentification utilise le header `X-User-ID` (ID de l'utilisateur connecté).

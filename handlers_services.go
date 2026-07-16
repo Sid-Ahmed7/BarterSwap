@@ -5,6 +5,18 @@ import (
 	"net/http"
 )
 
+// handleCreateService godoc
+// @Summary Créer une annonce de service
+// @Description Publie une nouvelle annonce de service par le prestataire connecté (requiert la compétence correspondante).
+// @Tags Services
+// @Accept json
+// @Produce json
+// @Param X-User-ID header int true "ID du prestataire"
+// @Param service body ServiceRequest true "Données du service"
+// @Success 201 {object} Service
+// @Failure 400 {string} string "Requête ou compétence invalide"
+// @Failure 403 {string} string "Accès interdit"
+// @Router /api/services [post]
 func handleCreateService(store ServiceStore) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		userID, err := parseUserID(r)
@@ -40,6 +52,16 @@ func handleCreateService(store ServiceStore) http.HandlerFunc {
 	}
 }
 
+// handleGetService godoc
+// @Summary Obtenir le détail d'un service
+// @Description Récupère les informations d'un service actif par son ID.
+// @Tags Services
+// @Produce json
+// @Param id path int true "ID du service"
+// @Success 200 {object} Service
+// @Failure 400 {string} string "ID invalide"
+// @Failure 404 {string} string "Service non trouvé ou inactif"
+// @Router /api/services/{id} [get]
 func handleGetService(store ServiceStore) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		id, err := parseID(r)
@@ -68,6 +90,16 @@ func handleGetService(store ServiceStore) http.HandlerFunc {
 	}
 }
 
+// handleListServices godoc
+// @Summary Rechercher des services
+// @Description Liste les services actifs avec filtres optionnels par catégorie, ville et recherche plein texte.
+// @Tags Services
+// @Produce json
+// @Param categorie query string false "Filtrer par catégorie"
+// @Param ville query string false "Filtrer par ville"
+// @Param search query string false "Recherche plein texte"
+// @Success 200 {array} Service
+// @Router /api/services [get]
 func handleListServices(store ServiceStore) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		query := r.URL.Query()
@@ -90,6 +122,20 @@ func handleListServices(store ServiceStore) http.HandlerFunc {
 	}
 }
 
+// handleUpdateService godoc
+// @Summary Modifier un service
+// @Description Met à jour le titre, la description, la catégorie, la durée ou les crédits d'un service existant. Le prestataire connecté doit être le propriétaire du service.
+// @Tags Services
+// @Accept json
+// @Produce json
+// @Param id path int true "ID du service"
+// @Param X-User-ID header int true "ID du prestataire"
+// @Param service body ServiceRequest true "Nouvelles données du service"
+// @Success 200 {object} Service
+// @Failure 400 {string} string "Requête invalide"
+// @Failure 403 {string} string "Accès interdit"
+// @Failure 404 {string} string "Service non trouvé"
+// @Router /api/services/{id} [put]
 func handleUpdateService(store ServiceStore) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		id, err := parseID(r)
@@ -145,6 +191,18 @@ func handleUpdateService(store ServiceStore) http.HandlerFunc {
 	}
 }
 
+// handleDeleteService godoc
+// @Summary Désactiver un service
+// @Description Désactive un service (l'annonce ne sera plus visible ni disponible). Le prestataire connecté doit être le propriétaire du service et il ne doit pas y avoir d'échange actif.
+// @Tags Services
+// @Param id path int true "ID du service"
+// @Param X-User-ID header int true "ID du prestataire"
+// @Success 204 "Désactivé avec succès"
+// @Failure 400 {string} string "ID invalide"
+// @Failure 403 {string} string "Accès interdit"
+// @Failure 404 {string} string "Service non trouvé"
+// @Failure 409 {string} string "Conflit (échange en cours)"
+// @Router /api/services/{id} [delete]
 func handleDeleteService(store ServiceStore, exchangeStore ExchangeStore) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		id, err := parseID(r)

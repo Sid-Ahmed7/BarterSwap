@@ -7,9 +7,17 @@ import (
 	"net/http"
 	"os"
 
+	_ "barterswap/docs"
+
 	_ "github.com/lib/pq"
+	httpSwagger "github.com/swaggo/http-swagger"
 )
 
+// @title BarterSwap API
+// @version 1.0
+// @description API REST d'échange de compétences via crédits-temps.
+// @host localhost:8080
+// @BasePath /
 func main() {
 	dsn := fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=disable",
 		os.Getenv("DB_HOST"),
@@ -57,6 +65,7 @@ func main() {
 	mux.HandleFunc("GET /api/users/{id}/reviews", handleGetUserReviews(store))
 	mux.HandleFunc("GET /api/services/{id}/reviews", handleGetServiceReviews(store))
 	mux.HandleFunc("GET /api/users/{id}/stats", handleGetUserStats(store))
+	mux.HandleFunc("GET /swagger/{any...}", httpSwagger.WrapHandler)
 
 	port := os.Getenv("SERVER_PORT")
 	if port == "" {
