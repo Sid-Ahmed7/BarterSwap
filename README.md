@@ -19,17 +19,28 @@ La documentation interactive Swagger est disponible sur `http://localhost:8080/s
 
 ## Variables d'environnement
 
-Définies dans le fichier `.env` à la racine :
+Créer un fichier `.env` à la racine du projet :
 
-| Variable          | Description              |
-|-------------------|--------------------------|
-| POSTGRES_USER     | Utilisateur PostgreSQL   |
-| POSTGRES_PASSWORD | Mot de passe PostgreSQL  |
-| POSTGRES_DB       | Nom de la base           |
-| DB_HOST           | Hôte de la base          | 
-| DB_PORT           | Port PostgreSQL interne  |
-| DB_EXPOSED_PORT   | Port PostgreSQL exposé sur l'hôte |
-| SERVER_PORT       | Port du serveur HTTP     | 
+```env
+POSTGRES_USER=barterswap
+POSTGRES_PASSWORD=votre_mot_de_passe
+POSTGRES_DB=barterswap
+DB_HOST=db
+DB_PORT=5432
+SERVER_PORT=8080
+```
+
+Pour les tests, créer un fichier `.env.test` à la racine :
+
+```env
+POSTGRES_USER=barterswap
+POSTGRES_PASSWORD=votre_mot_de_passe
+POSTGRES_DB=barterswap_test
+DB_HOST=db-test
+DB_PORT=5432
+SERVER_PORT=8080
+TEST_DATABASE_URL=postgres://barterswap:votre_mot_de_passe@db-test:5432/barterswap_test?sslmode=disable
+```
 
 > L'authentification utilise le header `X-User-ID` (ID de l'utilisateur connecté).
 
@@ -37,39 +48,39 @@ Définies dans le fichier `.env` à la racine :
 
 ### Utilisateurs
 
-| Méthode | Path                       | Description                              |
-|---------|----------------------------|------------------------------------------|
-| POST    | /api/users                 | Créer un compte (10 crédits offerts)     |
-| GET     | /api/users/{id}            | Profil public d'un utilisateur           |
-| PUT     | /api/users/{id}            | Modifier son profil                       |
-| GET     | /api/users/{id}/skills     | Compétences d'un utilisateur             |
-| PUT     | /api/users/{id}/skills     | Définir ses compétences                   |
-| GET     | /api/users/{id}/reviews    | Avis reçus par un utilisateur            |
-| GET     | /api/users/{id}/stats      | Statistiques d'un utilisateur            |
+| Méthode | Path                    | Description                          |
+|---------|-------------------------|--------------------------------------|
+| POST    | /api/users              | Créer un compte (10 crédits offerts) |
+| GET     | /api/users/{id}         | Profil public d'un utilisateur       |
+| PUT     | /api/users/{id}         | Modifier son profil                  |
+| GET     | /api/users/{id}/skills  | Compétences d'un utilisateur         |
+| PUT     | /api/users/{id}/skills  | Définir ses compétences              |
+| GET     | /api/users/{id}/reviews | Avis reçus par un utilisateur        |
+| GET     | /api/users/{id}/stats   | Statistiques d'un utilisateur        |
 
 ### Services
 
-| Méthode | Path                       | Description                              |
-|---------|----------------------------|------------------------------------------|
-| POST    | /api/services              | Créer une annonce                        |
+| Méthode | Path                       | Description                                     |
+|---------|----------------------------|-------------------------------------------------|
+| POST    | /api/services              | Créer une annonce                               |
 | GET     | /api/services              | Liste (filtres: `categorie`, `ville`, `search`) |
-| GET     | /api/services/{id}         | Détail d'un service                      |
-| PUT     | /api/services/{id}         | Modifier son annonce                     |
-| DELETE  | /api/services/{id}         | Supprimer son annonce                    |
-| GET     | /api/services/{id}/reviews | Avis sur un service                      |
+| GET     | /api/services/{id}         | Détail d'un service                             |
+| PUT     | /api/services/{id}         | Modifier son annonce                            |
+| DELETE  | /api/services/{id}         | Supprimer son annonce                           |
+| GET     | /api/services/{id}/reviews | Avis sur un service                             |
 
 ### Échanges
 
-| Méthode | Path                              | Description                        |
-|---------|-----------------------------------|------------------------------------|
-| POST    | /api/exchanges                    | Créer une demande                  |
-| GET     | /api/exchanges                    | Mes échanges (filtre: `status`)    |
-| GET     | /api/exchanges/{id}               | Détail d'un échange                |
-| PUT     | /api/exchanges/{id}/accept        | Accepter un échange (prestataire)  |
-| PUT     | /api/exchanges/{id}/reject        | Refuser un échange (prestataire)   |
-| PUT     | /api/exchanges/{id}/complete      | Terminer un échange (demandeur)    |
-| PUT     | /api/exchanges/{id}/cancel        | Annuler un échange                 |
-| POST    | /api/exchanges/{id}/review        | Laisser un avis                    |
+| Méthode | Path                           | Description                       |
+|---------|--------------------------------|-----------------------------------|
+| POST    | /api/exchanges                 | Créer une demande                 |
+| GET     | /api/exchanges                 | Mes échanges (filtre: `status`)   |
+| GET     | /api/exchanges/{id}            | Détail d'un échange               |
+| PUT     | /api/exchanges/{id}/accept     | Accepter un échange (prestataire) |
+| PUT     | /api/exchanges/{id}/reject     | Refuser un échange (prestataire)  |
+| PUT     | /api/exchanges/{id}/complete   | Terminer un échange (demandeur)   |
+| PUT     | /api/exchanges/{id}/cancel     | Annuler un échange                |
+| POST    | /api/exchanges/{id}/review     | Laisser un avis                   |
 
 ## Exemples curl
 
@@ -79,15 +90,14 @@ curl -s -X POST http://localhost:8080/api/users \
   -H "Content-Type: application/json" \
   -d '{"pseudo":"Alice","ville":"Paris"}' | jq
 
-
 # Définir ses compétences puis publier un service
 curl -s -X PUT http://localhost:8080/api/users/1/skills \
   -H "Content-Type: application/json" -H "X-User-ID: 1" \
-  -d '[{"nom":"Jardinage","niveau":"expert"}]'
+  -d '[{"nom":"Jardinage","niveau":"expert"}]' | jq
 
 curl -s -X POST http://localhost:8080/api/services \
   -H "Content-Type: application/json" -H "X-User-ID: 1" \
-  -d '{"titre":"Taille de haies","categorie":"Jardinage","duree_minutes":60,"credits":2}' | jq
+  -d '{"titre":"Taille de haies","categorie":"Jardinage","duree_minutes":60,"credits":2,"ville":"Paris"}' | jq
 
 # Demander un échange, l'accepter puis le terminer
 curl -s -X POST http://localhost:8080/api/exchanges \
@@ -110,5 +120,5 @@ curl -s -X POST http://localhost:8080/api/exchanges/1/review \
 docker compose -f compose.test.yml up --build --abort-on-container-exit
 
 # Lancer les tests en local
-  go test -v -cover ./...
+go test -v -cover ./...
 ```
